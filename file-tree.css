@@ -1,0 +1,194 @@
+.file-tree-container {
+  font-family: Arial, sans-serif;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+/* Filter Section */
+.filter-section {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  margin-bottom: 20px;
+  padding: 15px;
+  background-color: #f5f5f5;
+  border-radius: 5px;
+}
+
+.filter-dropdown {
+  position: relative;
+  min-width: 200px;
+  flex-grow: 1;
+}
+
+.filter-label {
+  font-size: 12px;
+  font-weight: bold;
+  margin-bottom: 5px;
+  color: #555;
+}
+
+.dropdown-container {
+  position: relative;
+}
+
+.dropdown-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 15px;
+  background-color: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.dropdown-arrow {
+  font-size: 10px;
+  transition: transform 0.2s ease;
+}
+
+.dropdown-arrow.open {
+  transform: rotate(180deg);
+}
+
+.dropdown-content {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  background-color: white;
+  border: 1px solid #ddd;
+  border-top: none;
+  border-radius: 0 0 4px 4px;
+  z-index: 10;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.dropdown-search {
+  width: 100%;
+  padding: 10px;
+  border: none;
+  border-bottom: 1px solid #eee;
+  box-sizing: border-box;
+}
+
+.dropdown-options {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.dropdown-option {
+  padding: 10px 15px;
+  cursor: pointer;
+}
+
+.dropdown-option:hover {
+  background-color: #f5f5f5;
+}
+
+/* Selected Count */
+.selected-count {
+  margin-bottom: 15px;
+}
+
+.selection-info {
+  padding: 10px;
+  background-color: #e6f7ff;
+  border-radius: 4px;
+  font-weight: bold;
+  color: #0066cc;
+}
+
+/* Tree View */
+.tree-view {
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 10px;
+  background-color: white;
+}
+
+.tree-root {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+}
+
+.tree-children {
+  list-style-type: none;
+  padding-left: 20px;
+  margin: 0;
+}
+
+.tree-node {
+  margin: 5px 0;
+}
+
+.node-content {
+  display: flex;
+  align-items: center;
+  padding: 5px;
+  border-radius: 3px;
+}
+
+.node-content:hover {
+  background-color: #f5f5f5;
+}
+
+.node-checkbox {
+  margin-right: 5px;
+}
+
+.expand-icon {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  text-align: center;
+  line-height: 20px;
+  cursor: pointer;
+  font-weight: bold;
+  user-select: none;
+}
+
+.expand-icon.has-children {
+  color: #555;
+}
+
+.node-label {
+  cursor: pointer;
+  padding: 2px 5px;
+  user-select: none;
+}
+
+/* Node types styling */
+.tree-node.asv > .node-content > .node-label {
+  font-weight: bold;
+  color: #0066cc;
+}
+
+.tree-node.repo > .node-content > .node-label {
+  font-weight: bold;
+  color: #009900;
+}
+
+.tree-node.service > .node-content > .node-label {
+  color: #cc6600;
+}
+
+.tree-node.attribute > .node-content > .node-label {
+  color: #666;
+  font-style: italic;
+}
+
+.loading-indicator {
+  margin-left: 10px;
+  font-size: 12px;
+  color: #999;
+  font-style: italic;
+}
+
+
