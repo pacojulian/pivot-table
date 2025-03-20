@@ -9,26 +9,18 @@
 
 /* Filter Section */
 .filter-section {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
   gap: 15px;
   margin-bottom: 20px;
   padding: 15px;
   background-color: #f5f5f5;
-  border-radius: 5px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
 .filter-dropdown {
   position: relative;
-  min-width: 200px;
-  flex-grow: 1;
-}
-
-.filter-label {
-  font-size: 12px;
-  font-weight: bold;
-  margin-bottom: 5px;
-  color: #555;
 }
 
 .dropdown-container {
@@ -39,17 +31,26 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 15px;
+  padding: 12px 15px;
   background-color: white;
   border: 1px solid #ddd;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
   user-select: none;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+}
+
+.dropdown-header:hover {
+  background-color: #f9f9f9;
+  border-color: #ccc;
 }
 
 .dropdown-arrow {
   font-size: 10px;
   transition: transform 0.2s ease;
+  color: #666;
 }
 
 .dropdown-arrow.open {
@@ -58,23 +59,37 @@
 
 .dropdown-content {
   position: absolute;
-  top: 100%;
+  top: calc(100% + 5px);
   left: 0;
   width: 100%;
   background-color: white;
   border: 1px solid #ddd;
-  border-top: none;
-  border-radius: 0 0 4px 4px;
+  border-radius: 6px;
   z-index: 10;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+}
+
+.search-container {
+  padding: 10px;
+  border-bottom: 1px solid #eee;
+  background-color: #f9f9f9;
 }
 
 .dropdown-search {
   width: 100%;
-  padding: 10px;
-  border: none;
-  border-bottom: 1px solid #eee;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
   box-sizing: border-box;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.dropdown-search:focus {
+  border-color: #0066cc;
+  box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.2);
 }
 
 .dropdown-options {
@@ -85,10 +100,17 @@
 .dropdown-option {
   padding: 10px 15px;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  transition: background-color 0.2s ease;
 }
 
 .dropdown-option:hover {
   background-color: #f5f5f5;
+}
+
+.option-checkbox {
+  margin-right: 10px;
 }
 
 /* Selected Count */
@@ -190,5 +212,4 @@
   color: #999;
   font-style: italic;
 }
-
 

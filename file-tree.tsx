@@ -264,12 +264,15 @@ export default function FileTree() {
   )
 
   // Handle filter changes
-  const handleFilterChange = (filterType: keyof typeof filters, value: string) => {
-    setFilters({
-      ...filters,
-      [filterType]: value,
-    })
-  }
+  const handleFilterChange = useCallback(
+    (filterType: keyof typeof filters, value: string) => {
+      setFilters({
+        ...filters,
+        [filterType]: value,
+      })
+    },
+    [filters, setFilters],
+  )
 
   // Render tree nodes recursively
   const renderTreeNodes = (nodes: TreeNode[]) => {
@@ -301,63 +304,74 @@ export default function FileTree() {
   }
 
   // Render filter dropdown
-  const renderFilterDropdown = (filterType: keyof typeof filters, options: Set<string>) => {
-    const [isOpen, setIsOpen] = useState(false)
-    const [searchTerm, setSearchTerm] = useState("")
+  const renderFilterDropdown = useCallback(
+    (filterType: keyof typeof filters, options: Set<string>) => {
+      const [isOpen, setIsOpen] = useState(false)
+      const [searchTerm, setSearchTerm] = useState("")
 
-    const filteredOptions = Array.from(options).filter((option) =>
-      option.toLowerCase().includes(searchTerm.toLowerCase()),
-    )
+      const filteredOptions = Array.from(options).filter((option) =>
+        option.toLowerCase().includes(searchTerm.toLowerCase()),
+      )
 
-    return (
-      <div className="filter-dropdown">
-        <div className="filter-label">{filterType.toUpperCase()}</div>
-        <div className="dropdown-container">
-          <div className="dropdown-header" onClick={() => setIsOpen(!isOpen)}>
-            {filters[filterType] || `Select ${filterType}`}
-            <span className={`dropdown-arrow ${isOpen ? "open" : ""}`}>▼</span>
-          </div>
-          {isOpen && (
-            <div className="dropdown-content">
-              <input
-                type="text"
-                placeholder="Search..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                onClick={(e) => e.stopPropagation()}
-                className="dropdown-search"
-              />
-              <div className="dropdown-options">
-                <div
-                  className="dropdown-option"
-                  onClick={() => {
-                    handleFilterChange(filterType, "")
-                    setIsOpen(false)
-                    setSearchTerm("")
-                  }}
-                >
-                  Clear
+      return (
+        <div className="filter-dropdown">
+          <div className="dropdown-container">
+            <div className="dropdown-header" onClick={() => setIsOpen(!isOpen)}>
+              {filters[filterType] || filterType.toUpperCase()}
+              <span className={`dropdown-arrow ${isOpen ? "open" : ""}`}>▼</span>
+            </div>
+            {isOpen && (
+              <div className="dropdown-content">
+                <div className="search-container">
+                  <input
+                    type="text"
+                    placeholder="Search..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="dropdown-search"
+                  />
                 </div>
-                {filteredOptions.map((option) => (
+                <div className="dropdown-options">
                   <div
-                    key={option}
                     className="dropdown-option"
                     onClick={() => {
-                      handleFilterChange(filterType, option)
+                      handleFilterChange(filterType, "")
                       setIsOpen(false)
                       setSearchTerm("")
                     }}
                   >
-                    {option}
+                    <input type="checkbox" checked={filters[filterType] === ""} readOnly className="option-checkbox" />
+                    <span>All {filterType.toUpperCase()}</span>
                   </div>
-                ))}
+                  {filteredOptions.map((option) => (
+                    <div
+                      key={option}
+                      className="dropdown-option"
+                      onClick={() => {
+                        handleFilterChange(filterType, option)
+                        setIsOpen(false)
+                        setSearchTerm("")
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={filters[filterType] === option}
+                        readOnly
+                        className="option-checkbox"
+                      />
+                      <span>{option}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
-      </div>
-    )
-  }
+      )
+    },
+    [filters, handleFilterChange],
+  )
 
   return (
     <div className="file-tree-container">
