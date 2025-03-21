@@ -31,27 +31,24 @@ type DataItem = {
   asv: ASV
 }
 
-// Type for flattened data row
+interface Group {
+  _isExpanded: boolean;
+  _groupField: string;
+  _groupValue: string;
+  _rows: FlatDataRow[];
+  [nestedKey: string]: GroupedData;
+}
+
 interface FlatDataRow {
-  asvId: string
-  repoName: string
-  repoUsecase: string
-  repoStatus: string | number
-  serviceName: string
-  attributeName: string
+  asvId: string;
+  repoName: string;
+  repoUsecase: string;
+  repoStatus: string | number;
+  serviceName: string;
+  attributeName: string;
 }
 
-// Type for grouped data structure
-interface GroupedData {
-  [key: string]: {
-    _isExpanded: boolean
-    _groupField: string
-    _groupValue: string
-    _rows: FlatDataRow[]
-    [nestedKey: string]: any // Allow nested grouping while maintaining base structure
-  } | FlatDataRow[] | boolean | string
-}
-
+type GroupedData = Group | FlatDataRow[] | boolean | string;
 // Sample data remains the same
 const sampleData: DataItem[] = [/* ... same as original ... */]
 
