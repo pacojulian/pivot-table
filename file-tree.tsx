@@ -19,7 +19,7 @@ type Service = {
 type Repo = {
   name: string
   usecase: string
-  status: number
+  status: string
   services: Service[]
 }
 
@@ -40,7 +40,7 @@ const sampleData: DataItem[] = [
       repo: {
         name: "Repository A",
         usecase: "Data Analysis",
-        status: 200,
+        status: "In Progress",
         services: [
           {
             name: "cch",
