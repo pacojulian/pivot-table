@@ -1,251 +1,145 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect, useRef } from "react"
-import "./file-tree-explorer.css"
+import "./pivot-table.css"
 
-// Define the data structure types based on the new sample
-interface Attribute {
+// Define types for the provided data structure
+type Attribute = {
   "attribute-name": string
+  value?: any
 }
 
-interface Service {
+type Service = {
   name: string
-  cch: Attribute[]
+  attributes: Attribute[]
 }
 
-interface DataItem {
-  asv: string
-  repo: string
+type Repo = {
+  name: string
   usecase: string
   status: number
-  field1: string
-  field2: string
   services: Service[]
 }
 
-// Sample data structure
-const SAMPLE_DATA: DataItem[] = [
+type ASV = {
+  id: string
+  repo: Repo
+}
+
+type DataItem = {
+  asv: ASV
+}
+
+// Sample data based on the provided structure
+const sampleData: DataItem[] = [
   {
-    asv: "ASV-001",
-    repo: "Repository A",
-    usecase: "Data Analysis",
-    status: 200,
-    field1: "value1",
-    field2: "value2",
-    services: [
-      {
-        name: "Service 1",
-        cch: [{ "attribute-name": "accountReferenceId" }, { "attribute-name": "accountName" }],
+    asv: {
+      id: "ASV-001",
+      repo: {
+        name: "Repository A",
+        usecase: "Data Analysis",
+        status: 200,
+        services: [
+          {
+            name: "cch",
+            attributes: [{ "attribute-name": "accountReferenceId" }, { "attribute-name": "accountName" }],
+          },
+        ],
       },
-    ],
+    },
   },
   {
-    asv: "ASV-001",
-    repo: "Repository B",
-    usecase: "Data Processing",
-    status: 404,
-    field1: "value3",
-    field2: "value4",
-    services: [
-      {
-        name: "Service 2",
-        cch: [{ "attribute-name": "customerId" }, { "attribute-name": "customerAddress" }],
+    asv: {
+      id: "ASV-002",
+      repo: {
+        name: "Repository B",
+        usecase: "Reporting",
+        status: 200,
+        services: [
+          {
+            name: "reporting",
+            attributes: [{ "attribute-name": "reportId" }, { "attribute-name": "reportName" }],
+          },
+        ],
       },
-    ],
+    },
   },
   {
-    asv: "ASV-002",
-    repo: "Repository C",
-    usecase: "Reporting",
-    status: 200,
-    field1: "value5",
-    field2: "value2",
-    services: [
-      {
-        name: "Service 3",
-        cch: [{ "attribute-name": "reportId" }, { "attribute-name": "reportName" }],
+    asv: {
+      id: "ASV-003",
+      repo: {
+        name: "Repository A",
+        usecase: "Analytics",
+        status: 404,
+        services: [
+          {
+            name: "analytics",
+            attributes: [{ "attribute-name": "metricId" }, { "attribute-name": "metricValue" }],
+          },
+          {
+            name: "dashboard",
+            attributes: [{ "attribute-name": "dashboardId" }, { "attribute-name": "dashboardName" }],
+          },
+        ],
       },
-      {
-        name: "Service 4",
-        cch: [{ "attribute-name": "timestamp" }, { "attribute-name": "duration" }],
-      },
-    ],
+    },
   },
 ]
 
-// Filter type for dropdown filters
-type FilterType = "asv" | "repo" | "field1" | "field2"
+// Flatten data for table display
+const flattenData = (data: DataItem[]) => {
+  const flatData: any[] = []
 
-export default function FileTreeExplorer() {
-  const [expandedAsv, setExpandedAsv] = useState<string[]>([])
-  const [expandedRepo, setExpandedRepo] = useState<string[]>([])
-  const [selectedRepo, setSelectedRepo] = useState<string | null>(null)
-  const [selectedService, setSelectedService] = useState<Service | null>(null)
-  const [filteredData, setFilteredData] = useState<DataItem[]>(SAMPLE_DATA)
-  const [services, setServices] = useState<Service[]>([])
-  const [loading, setLoading] = useState(false)
+  data.forEach((item) => {
+    const asv = item.asv
+    const repo = asv.repo
 
-  // Filter states
-  const [openFilter, setOpenFilter] = useState<FilterType | null>(null)
-  const [filterSearchTerms, setFilterSearchTerms] = useState<{
-    asv: string
-    repo: string
-    field1: string
-    field2: string
-  }>({
-    asv: "",
-    repo: "",
-    field1: "",
-    field2: "",
+    repo.services.forEach((service) => {
+      service.attributes.forEach((attr) => {
+        const row = {
+          asvId: asv.id,
+          repoName: repo.name,
+          repoUsecase: repo.usecase,
+          repoStatus: repo.status,
+          serviceName: service.name,
+          attributeName: attr["attribute-name"],
+        }
+        flatData.push(row)
+      })
+    })
   })
 
-  const [activeFilters, setActiveFilters] = useState<{
-    asv: string[]
-    repo: string[]
-    field1: string[]
-    field2: string[]
-  }>({
-    asv: [],
-    repo: [],
-    field1: [],
-    field2: [],
-  })
+  return flatData
+}
 
-  // Available filter options
-  const [availableFilters, setAvailableFilters] = useState<{
-    asv: string[]
-    repo: string[]
-    field1: string[]
-    field2: string[]
-  }>({
-    asv: [],
-    repo: [],
-    field1: [],
-    field2: [],
-  })
+// Get unique values for filters
+const getUniqueValues = (data: any[], field: string) => {
+  const values = new Set(data.map((item) => item[field]))
+  return Array.from(values)
+}
 
-  // Refs for filter dropdowns
-  const filterRefs = {
-    asv: useRef<HTMLDivElement>(null),
-    repo: useRef<HTMLDivElement>(null),
-    field1: useRef<HTMLDivElement>(null),
-    field2: useRef<HTMLDivElement>(null),
-  }
+// Component for custom checkbox dropdown with search
+const CheckboxDropdown = ({
+  label,
+  options,
+  selectedOptions,
+  onChange,
+}: {
+  label: string
+  options: string[]
+  selectedOptions: string[]
+  onChange: (selected: string[]) => void
+}) => {
+  const [isOpen, setIsOpen] = useState(false)
+  const [searchTerm, setSearchTerm] = useState("")
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
-  // Extract all available filter options from the data
   useEffect(() => {
-    const asvs = Array.from(new Set(SAMPLE_DATA.map((item) => item.asv)))
-    const repos = Array.from(new Set(SAMPLE_DATA.map((item) => item.repo)))
-    const field1s = Array.from(new Set(SAMPLE_DATA.map((item) => item.field1)))
-    const field2s = Array.from(new Set(SAMPLE_DATA.map((item) => item.field2)))
-
-    setAvailableFilters({
-      asv: asvs,
-      repo: repos,
-      field1: field1s,
-      field2: field2s,
-    })
-  }, [])
-
-  // Apply filters to the data
-  useEffect(() => {
-    let filtered = [...SAMPLE_DATA]
-
-    // Apply ASV filter
-    if (activeFilters.asv.length > 0) {
-      filtered = filtered.filter((item) => activeFilters.asv.includes(item.asv))
-    }
-
-    // Apply Repo filter
-    if (activeFilters.repo.length > 0) {
-      filtered = filtered.filter((item) => activeFilters.repo.includes(item.repo))
-    }
-
-    // Apply Field1 filter
-    if (activeFilters.field1.length > 0) {
-      filtered = filtered.filter((item) => activeFilters.field1.includes(item.field1))
-    }
-
-    // Apply Field2 filter
-    if (activeFilters.field2.length > 0) {
-      filtered = filtered.filter((item) => activeFilters.field2.includes(item.field2))
-    }
-
-    setFilteredData(filtered)
-
-    // Reset selected repo if it's no longer in filtered data
-    if (selectedRepo && !filtered.some((item) => item.repo === selectedRepo)) {
-      setSelectedRepo(null)
-      setSelectedService(null)
-    }
-  }, [activeFilters, selectedRepo])
-
-  // Toggle filter dropdown
-  const toggleFilter = (filterType: FilterType) => {
-    setOpenFilter((prev) => (prev === filterType ? null : filterType))
-
-    // Reset search term when opening filter
-    if (openFilter !== filterType) {
-      setFilterSearchTerms((prev) => ({
-        ...prev,
-        [filterType]: "",
-      }))
-    }
-  }
-
-  // Handle filter search term change
-  const handleFilterSearch = (filterType: FilterType, term: string) => {
-    setFilterSearchTerms((prev) => ({
-      ...prev,
-      [filterType]: term,
-    }))
-  }
-
-  // Toggle a filter item selection
-  const toggleFilterItem = (filterType: FilterType, value: string) => {
-    setActiveFilters((prev) => {
-      const isActive = prev[filterType].includes(value)
-
-      if (isActive) {
-        return {
-          ...prev,
-          [filterType]: prev[filterType].filter((item) => item !== value),
-        }
-      } else {
-        return {
-          ...prev,
-          [filterType]: [...prev[filterType], value],
-        }
-      }
-    })
-  }
-
-  // Clear all filters
-  const clearAllFilters = () => {
-    setActiveFilters({
-      asv: [],
-      repo: [],
-      field1: [],
-      field2: [],
-    })
-  }
-
-  // Clear a specific filter
-  const clearFilter = (filterType: FilterType) => {
-    setActiveFilters((prev) => ({
-      ...prev,
-      [filterType]: [],
-    }))
-  }
-
-  // Handle click outside to close filter dropdowns
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (openFilter) {
-        const ref = filterRefs[openFilter]
-        if (ref.current && !ref.current.contains(event.target as Node)) {
-          setOpenFilter(null)
-        }
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false)
       }
     }
 
@@ -253,412 +147,396 @@ export default function FileTreeExplorer() {
     return () => {
       document.removeEventListener("mousedown", handleClickOutside)
     }
-  }, [openFilter])
+  }, [])
 
-  // Handle expanding/collapsing ASV nodes
-  const toggleAsv = (asvName: string) => {
-    setExpandedAsv((prev) => (prev.includes(asvName) ? prev.filter((name) => name !== asvName) : [...prev, asvName]))
-  }
-
-  // Handle expanding/collapsing Repo nodes
-  const toggleRepo = (repoName: string) => {
-    setExpandedRepo((prev) =>
-      prev.includes(repoName) ? prev.filter((name) => name !== repoName) : [...prev, repoName],
-    )
-  }
-
-  // Mock fetching services for a repo
-  const fetchServices = (repo: string) => {
-    setLoading(true)
-
-    // Simulate API call with setTimeout
-    setTimeout(() => {
-      const repoData = SAMPLE_DATA.find((item) => item.repo === repo)
-      if (repoData) {
-        setServices(repoData.services)
-      } else {
-        setServices([])
-      }
-      setLoading(false)
-    }, 500) // 500ms delay to simulate network request
-  }
-
-  // Handle selecting a repo
-  const selectRepo = (repo: string) => {
-    if (selectedRepo === repo) {
-      setSelectedRepo(null)
-      setSelectedService(null)
-      setServices([])
+  const handleToggle = (option: string) => {
+    if (selectedOptions.includes(option)) {
+      onChange(selectedOptions.filter((item) => item !== option))
     } else {
-      setSelectedRepo(repo)
-      setSelectedService(null)
-      fetchServices(repo)
+      onChange([...selectedOptions, option])
     }
   }
 
-  // Handle selecting a service
-  const selectService = (service: Service) => {
-    setSelectedService(service)
+  const toggleAll = () => {
+    if (selectedOptions.length === options.length) {
+      onChange([])
+    } else {
+      onChange([...options])
+    }
   }
 
-  // Get filtered options for a filter type
-  const getFilteredOptions = (filterType: FilterType) => {
-    const searchTerm = filterSearchTerms[filterType].toLowerCase()
-    return availableFilters[filterType].filter((option) => !searchTerm || option.toLowerCase().includes(searchTerm))
-  }
-
-  // Count active filters
-  const activeFilterCount =
-    activeFilters.asv.length + activeFilters.repo.length + activeFilters.field1.length + activeFilters.field2.length
+  const filteredOptions = options.filter((option) => option.toLowerCase().includes(searchTerm.toLowerCase()))
 
   return (
-    <div className="file-tree-container">
-      <div className="filters-container">
-        <div className="filters-row">
-          {/* ASV Filter */}
-          <div className="filter-dropdown-container">
-            <button
-              className={`filter-button ${activeFilters.asv.length > 0 ? "has-filters" : ""}`}
-              onClick={() => toggleFilter("asv")}
-            >
-              ASV {activeFilters.asv.length > 0 && `(${activeFilters.asv.length})`}
-            </button>
-            {openFilter === "asv" && (
-              <div className="filter-dropdown" ref={filterRefs.asv}>
-                <div className="filter-dropdown-header">
-                  <input
-                    type="text"
-                    placeholder="Search ASVs..."
-                    value={filterSearchTerms.asv}
-                    onChange={(e) => handleFilterSearch("asv", e.target.value)}
-                    className="filter-search-input"
-                  />
-                  {activeFilters.asv.length > 0 && (
-                    <button className="clear-filter-button" onClick={() => clearFilter("asv")}>
-                      Clear
-                    </button>
-                  )}
-                </div>
-                <div className="filter-options">
-                  {getFilteredOptions("asv").map((asv) => (
-                    <label key={asv} className="filter-option">
-                      <input
-                        type="checkbox"
-                        checked={activeFilters.asv.includes(asv)}
-                        onChange={() => toggleFilterItem("asv", asv)}
-                      />
-                      {asv}
-                    </label>
-                  ))}
-                  {getFilteredOptions("asv").length === 0 && <div className="no-filter-results">No matching ASVs</div>}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Repo Filter */}
-          <div className="filter-dropdown-container">
-            <button
-              className={`filter-button ${activeFilters.repo.length > 0 ? "has-filters" : ""}`}
-              onClick={() => toggleFilter("repo")}
-            >
-              Repository {activeFilters.repo.length > 0 && `(${activeFilters.repo.length})`}
-            </button>
-            {openFilter === "repo" && (
-              <div className="filter-dropdown" ref={filterRefs.repo}>
-                <div className="filter-dropdown-header">
-                  <input
-                    type="text"
-                    placeholder="Search repositories..."
-                    value={filterSearchTerms.repo}
-                    onChange={(e) => handleFilterSearch("repo", e.target.value)}
-                    className="filter-search-input"
-                  />
-                  {activeFilters.repo.length > 0 && (
-                    <button className="clear-filter-button" onClick={() => clearFilter("repo")}>
-                      Clear
-                    </button>
-                  )}
-                </div>
-                <div className="filter-options">
-                  {getFilteredOptions("repo").map((repo) => (
-                    <label key={repo} className="filter-option">
-                      <input
-                        type="checkbox"
-                        checked={activeFilters.repo.includes(repo)}
-                        onChange={() => toggleFilterItem("repo", repo)}
-                      />
-                      {repo}
-                    </label>
-                  ))}
-                  {getFilteredOptions("repo").length === 0 && (
-                    <div className="no-filter-results">No matching repositories</div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Field1 Filter */}
-          <div className="filter-dropdown-container">
-            <button
-              className={`filter-button ${activeFilters.field1.length > 0 ? "has-filters" : ""}`}
-              onClick={() => toggleFilter("field1")}
-            >
-              Field 1 {activeFilters.field1.length > 0 && `(${activeFilters.field1.length})`}
-            </button>
-            {openFilter === "field1" && (
-              <div className="filter-dropdown" ref={filterRefs.field1}>
-                <div className="filter-dropdown-header">
-                  <input
-                    type="text"
-                    placeholder="Search field1 values..."
-                    value={filterSearchTerms.field1}
-                    onChange={(e) => handleFilterSearch("field1", e.target.value)}
-                    className="filter-search-input"
-                  />
-                  {activeFilters.field1.length > 0 && (
-                    <button className="clear-filter-button" onClick={() => clearFilter("field1")}>
-                      Clear
-                    </button>
-                  )}
-                </div>
-                <div className="filter-options">
-                  {getFilteredOptions("field1").map((field1) => (
-                    <label key={field1} className="filter-option">
-                      <input
-                        type="checkbox"
-                        checked={activeFilters.field1.includes(field1)}
-                        onChange={() => toggleFilterItem("field1", field1)}
-                      />
-                      {field1}
-                    </label>
-                  ))}
-                  {getFilteredOptions("field1").length === 0 && (
-                    <div className="no-filter-results">No matching field1 values</div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Field2 Filter */}
-          <div className="filter-dropdown-container">
-            <button
-              className={`filter-button ${activeFilters.field2.length > 0 ? "has-filters" : ""}`}
-              onClick={() => toggleFilter("field2")}
-            >
-              Field 2 {activeFilters.field2.length > 0 && `(${activeFilters.field2.length})`}
-            </button>
-            {openFilter === "field2" && (
-              <div className="filter-dropdown" ref={filterRefs.field2}>
-                <div className="filter-dropdown-header">
-                  <input
-                    type="text"
-                    placeholder="Search field2 values..."
-                    value={filterSearchTerms.field2}
-                    onChange={(e) => handleFilterSearch("field2", e.target.value)}
-                    className="filter-search-input"
-                  />
-                  {activeFilters.field2.length > 0 && (
-                    <button className="clear-filter-button" onClick={() => clearFilter("field2")}>
-                      Clear
-                    </button>
-                  )}
-                </div>
-                <div className="filter-options">
-                  {getFilteredOptions("field2").map((field2) => (
-                    <label key={field2} className="filter-option">
-                      <input
-                        type="checkbox"
-                        checked={activeFilters.field2.includes(field2)}
-                        onChange={() => toggleFilterItem("field2", field2)}
-                      />
-                      {field2}
-                    </label>
-                  ))}
-                  {getFilteredOptions("field2").length === 0 && (
-                    <div className="no-filter-results">No matching field2 values</div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Clear All Filters Button */}
-          {activeFilterCount > 0 && (
-            <button className="clear-all-filters-button" onClick={clearAllFilters}>
-              Clear All Filters
-            </button>
-          )}
-        </div>
-
-        {/* Active Filters Display */}
-        {activeFilterCount > 0 && (
-          <div className="active-filters">
-            <span className="active-filters-label">Active filters:</span>
-            <div className="filter-tags">
-              {activeFilters.asv.map((asv) => (
-                <div key={`asv-${asv}`} className="filter-tag">
-                  ASV: {asv}
-                  <span className="remove-tag" onClick={() => toggleFilterItem("asv", asv)}>
-                    ×
-                  </span>
-                </div>
-              ))}
-              {activeFilters.repo.map((repo) => (
-                <div key={`repo-${repo}`} className="filter-tag">
-                  Repo: {repo}
-                  <span className="remove-tag" onClick={() => toggleFilterItem("repo", repo)}>
-                    ×
-                  </span>
-                </div>
-              ))}
-              {activeFilters.field1.map((field1) => (
-                <div key={`field1-${field1}`} className="filter-tag">
-                  Field1: {field1}
-                  <span className="remove-tag" onClick={() => toggleFilterItem("field1", field1)}>
-                    ×
-                  </span>
-                </div>
-              ))}
-              {activeFilters.field2.map((field2) => (
-                <div key={`field2-${field2}`} className="filter-tag">
-                  Field2: {field2}
-                  <span className="remove-tag" onClick={() => toggleFilterItem("field2", field2)}>
-                    ×
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+    <div className="checkbox-dropdown" ref={dropdownRef}>
+      <div className="dropdown-header" onClick={() => setIsOpen(!isOpen)}>
+        <span>
+          {label} ({selectedOptions.length}/{options.length})
+        </span>
+        <span className={`dropdown-arrow ${isOpen ? "open" : ""}`}></span>
       </div>
-
-      <div className="main-content">
-        <div className="file-tree">
-          <h2>Repository Explorer</h2>
-          <div className="tree-content">
-            {filteredData.length > 0 ? (
-              Array.from(new Set(filteredData.map((item) => item.asv))).map((asv) => (
-                <div key={asv} className="tree-node">
-                  <div className="node-header" onClick={() => toggleAsv(asv)}>
-                    <span className="expand-icon">{expandedAsv.includes(asv) ? "▼" : "►"}</span>
-                    <span className="node-name asv-node">{asv}</span>
-                  </div>
-                  {expandedAsv.includes(asv) && (
-                    <div className="node-children">
-                      {filteredData
-                        .filter((item) => item.asv === asv)
-                        .map((item) => (
-                          <div key={item.repo} className="tree-node">
-                            <div
-                              className={`node-header repo-header ${selectedRepo === item.repo ? "selected" : ""}`}
-                              onClick={() => selectRepo(item.repo)}
-                            >
-                              <span className="node-name repo-node">{item.repo}</span>
-                            </div>
-                          </div>
-                        ))}
-                    </div>
-                  )}
-                </div>
-              ))
-            ) : (
-              <div className="no-results">No matching data found</div>
-            )}
+      {isOpen && (
+        <div className="dropdown-content">
+          <div className="dropdown-search">
+            <input
+              type="text"
+              placeholder="Search..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+            />
           </div>
+          <label className="checkbox-item">
+            <input type="checkbox" checked={selectedOptions.length === options.length} onChange={toggleAll} />
+            <span className="checkbox-label">Select All</span>
+          </label>
+          {filteredOptions.map((option) => (
+            <label key={option} className="checkbox-item">
+              <input type="checkbox" checked={selectedOptions.includes(option)} onChange={() => handleToggle(option)} />
+              <span className="checkbox-label">{option}</span>
+            </label>
+          ))}
+          {filteredOptions.length === 0 && <div className="no-results">No matching options</div>}
         </div>
-
-        <div className="content-panel">
-          {selectedRepo ? (
-            <div className="repo-details">
-              <div className="panel-header">
-                <h3>{selectedRepo}</h3>
-              </div>
-
-              {loading ? (
-                <div className="loading">Loading services...</div>
-              ) : (
-                <>
-                  {/* Repository Details */}
-                  {filteredData
-                    .filter((item) => item.repo === selectedRepo)
-                    .map((item, index) => (
-                      <div key={index} className="details-section">
-                        <h4>Repository Information</h4>
-                        <div className="detail-item">
-                          <span className="detail-label">ASV:</span>
-                          <span className="detail-value">{item.asv}</span>
-                        </div>
-                        <div className="detail-item">
-                          <span className="detail-label">Use Case:</span>
-                          <span className="detail-value">{item.usecase}</span>
-                        </div>
-                        <div className="detail-item">
-                          <span className="detail-label">Status:</span>
-                          <span className="detail-value">{item.status}</span>
-                        </div>
-                        <div className="detail-item">
-                          <span className="detail-label">Field 1:</span>
-                          <span className="detail-value">{item.field1}</span>
-                        </div>
-                        <div className="detail-item">
-                          <span className="detail-label">Field 2:</span>
-                          <span className="detail-value">{item.field2}</span>
-                        </div>
-                      </div>
-                    ))}
-
-                  {/* Services List */}
-                  <div className="services-section">
-                    <h4>Services</h4>
-                    {services.length > 0 ? (
-                      <div className="services-list">
-                        {services.map((service, index) => (
-                          <div
-                            key={index}
-                            className={`service-item ${selectedService?.name === service.name ? "selected" : ""}`}
-                            onClick={() => selectService(service)}
-                          >
-                            {service.name}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="no-results">No services found</div>
-                    )}
-                  </div>
-
-                  {/* Selected Service Attributes */}
-                  {selectedService && (
-                    <div className="attributes-section">
-                      <h4>{selectedService.name} Attributes</h4>
-                      <div className="attributes-list">
-                        {selectedService.cch.length > 0 ? (
-                          selectedService.cch.map((attr, index) => (
-                            <div key={index} className="attribute-item">
-                              <span className="attribute-name">{attr["attribute-name"]}</span>
-                            </div>
-                          ))
-                        ) : (
-                          <div className="no-results">No attributes found</div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          ) : (
-            <div className="select-prompt">
-              <p>Select a repository to view details</p>
-            </div>
-          )}
-        </div>
-      </div>
+      )}
     </div>
   )
 }
 
+// Main Pivot Table Component
+export default function PivotTable() {
+  const [data] = useState<DataItem[]>(sampleData)
+  const [flatData, setFlatData] = useState<any[]>([])
+  const [filteredData, setFilteredData] = useState<any[]>([])
+
+  // Available grouping fields
+  const availableGroups = [
+    { id: "asvId", label: "ASV ID" },
+    { id: "repoName", label: "Repository Name" },
+    { id: "repoUsecase", label: "Repository Usecase" },
+    { id: "repoStatus", label: "Repository Status" },
+    { id: "serviceName", label: "Service Name" },
+    { id: "attributeName", label: "Attribute Name" },
+  ]
+
+  // Grouping state - ordered list of selected groups
+  const [activeGroups, setActiveGroups] = useState<string[]>(["asvId", "repoName", "serviceName", "attributeName"])
+
+  // Filter states
+  const [asvFilters, setAsvFilters] = useState<string[]>([])
+  const [repoFilters, setRepoFilters] = useState<string[]>([])
+  const [serviceFilters, setServiceFilters] = useState<string[]>([])
+
+  // Unique values for filters
+  const [uniqueAsvs, setUniqueAsvs] = useState<string[]>([])
+  const [uniqueRepos, setUniqueRepos] = useState<string[]>([])
+  const [uniqueServices, setUniqueServices] = useState<string[]>([])
+
+  // Initialize data
+  useEffect(() => {
+    const flattened = flattenData(data)
+    setFlatData(flattened)
+    setFilteredData(flattened)
+
+    setUniqueAsvs(getUniqueValues(flattened, "asvId"))
+    setUniqueRepos(getUniqueValues(flattened, "repoName"))
+    setUniqueServices(getUniqueValues(flattened, "serviceName"))
+
+    // Initialize filters with all values selected
+    setAsvFilters(getUniqueValues(flattened, "asvId") as string[])
+    setRepoFilters(getUniqueValues(flattened, "repoName") as string[])
+    setServiceFilters(getUniqueValues(flattened, "serviceName") as string[])
+  }, [data])
+
+  // Apply filters
+  useEffect(() => {
+    const filtered = flatData.filter(
+      (item) =>
+        asvFilters.includes(item.asvId) &&
+        repoFilters.includes(item.repoName) &&
+        serviceFilters.includes(item.serviceName),
+    )
+    setFilteredData(filtered)
+  }, [flatData, asvFilters, repoFilters, serviceFilters])
+
+  // Group data for display based on active groups
+  const groupData = (data: any[]) => {
+    if (activeGroups.length === 0) return { _rows: data }
+
+    const grouped: any = {}
+
+    data.forEach((row) => {
+      let currentLevel = grouped
+
+      // Create nested structure based on active groups
+      activeGroups.forEach((group, index) => {
+        const groupValue = row[group]
+
+        if (!currentLevel[groupValue]) {
+          currentLevel[groupValue] = {
+            _isExpanded: index < 1, // Expand first level by default
+            _groupField: group,
+            _groupValue: groupValue,
+            _rows: [],
+          }
+        }
+
+        if (index === activeGroups.length - 1) {
+          currentLevel[groupValue]._rows.push(row)
+        }
+
+        currentLevel = currentLevel[groupValue]
+      })
+    })
+
+    return grouped
+  }
+
+  const groupedData = groupData(filteredData)
+
+  // Toggle row expansion
+  const toggleExpand = (path: string[]) => {
+    const element = document.querySelector(`[data-path="${path.join(".")}"]`)
+    if (element) {
+      element.classList.toggle("expanded")
+
+      // Toggle visibility of child rows
+      const childRows = document.querySelectorAll(`[data-parent^="${path.join(".")}"]`)
+      childRows.forEach((row) => {
+        ;(row as HTMLElement).style.display = element.classList.contains("expanded") ? "table-row" : "none"
+      })
+    }
+  }
+
+  // Render table rows recursively
+  const renderRows = (data: any, path: string[] = [], level = 0, parentPath = "") => {
+    if (!data) return null
+
+    if (level === 0 && activeGroups.length === 0) {
+      // If no grouping is selected, render flat data
+      return data._rows.map((row: any, index: number) => (
+        <tr key={`row-${index}`} className="data-row">
+          {Object.keys(row).map((field) => (
+            <td key={field}>{row[field]}</td>
+          ))}
+        </tr>
+      ))
+    }
+
+    return Object.keys(data)
+      .filter((key) => key !== "_isExpanded" && key !== "_rows" && key !== "_groupField" && key !== "_groupValue")
+      .map((key) => {
+        const currentPath = [...path, key]
+        const pathString = currentPath.join(".")
+        const parentPathString = parentPath ? parentPath : ""
+        const currentGroup = data[key]
+
+        return (
+          <>
+            <tr
+              key={pathString}
+              className={`group-row level-${level} ${currentGroup._isExpanded ? "expanded" : ""}`}
+              data-path={pathString}
+              data-parent={parentPathString}
+              style={{ display: level === 0 || parentPathString === "" ? "table-row" : "none" }}
+            >
+              {activeGroups.map((group, i) => {
+                if (i === level) {
+                  return (
+                    <td key={i} className="group-cell">
+                      <div className="expander-cell">
+                        <button
+                          className={`expander ${currentGroup._isExpanded ? "expanded" : ""}`}
+                          onClick={() => toggleExpand(currentPath)}
+                        ></button>
+                        <span>{key}</span>
+                      </div>
+                    </td>
+                  )
+                } else if (i < level) {
+                  return <td key={i} className="empty-cell"></td>
+                } else {
+                  return <td key={i}></td>
+                }
+              })}
+            </tr>
+
+            {/* If this is the last level, render the data rows */}
+            {level === activeGroups.length - 1 &&
+              currentGroup._rows.map((row: any, rowIndex: number) => (
+                <tr
+                  key={`${pathString}-row-${rowIndex}`}
+                  className="data-row"
+                  data-parent={pathString}
+                  style={{ display: currentGroup._isExpanded ? "table-row" : "none" }}
+                >
+                  {activeGroups.map((group, i) => (
+                    <td key={i} className={i < level ? "empty-cell" : i === level ? "highlight-cell" : ""}>
+                      {i === level ? row[group] : ""}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+
+            {/* Render child groups */}
+            {level < activeGroups.length - 1 && renderRows(currentGroup, currentPath, level + 1, pathString)}
+          </>
+        )
+      })
+  }
+
+  // Handle drag start for a group item
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    e.dataTransfer.setData("text/plain", index.toString())
+    e.currentTarget.classList.add("dragging")
+  }
+
+  // Handle drag over for a group item
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    const target = e.currentTarget as HTMLElement
+    target.classList.add("drag-over")
+  }
+
+  // Handle drag leave for a group item
+  const handleDragLeave = (e: React.DragEvent) => {
+    const target = e.currentTarget as HTMLElement
+    target.classList.remove("drag-over")
+  }
+
+  // Handle drop for a group item
+  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault()
+    const dragIndex = Number.parseInt(e.dataTransfer.getData("text/plain"))
+    const target = e.currentTarget as HTMLElement
+    target.classList.remove("drag-over")
+
+    if (dragIndex !== dropIndex) {
+      const newGroups = [...activeGroups]
+      const [removed] = newGroups.splice(dragIndex, 1)
+      newGroups.splice(dropIndex, 0, removed)
+      setActiveGroups(newGroups)
+    }
+  }
+
+  // Handle drag end
+  const handleDragEnd = (e: React.DragEvent) => {
+    e.currentTarget.classList.remove("dragging")
+  }
+
+  // Add a group to the active groups
+  const addGroup = (groupId: string) => {
+    if (!activeGroups.includes(groupId)) {
+      setActiveGroups([...activeGroups, groupId])
+    }
+  }
+
+  // Remove a group from active groups
+  const removeGroup = (groupId: string) => {
+    setActiveGroups(activeGroups.filter((g) => g !== groupId))
+  }
+
+  return (
+    <div className="pivot-table-container">
+      <div className="pivot-controls">
+        <div className="grouping-controls">
+          <h3>Row Grouping</h3>
+
+          <div className="grouping-explanation">
+            <p>Drag and drop to reorder. The order determines the hierarchy of your data grouping.</p>
+          </div>
+
+          <div className="active-groups">
+            {activeGroups.length > 0 ? (
+              <div className="active-groups-list">
+                {activeGroups.map((group, index) => (
+                  <div
+                    key={group}
+                    className="group-pill"
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, index)}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => handleDrop(e, index)}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <span className="group-pill-text">
+                      {index + 1}. {availableGroups.find((g) => g.id === group)?.label}
+                    </span>
+                    <button className="group-pill-remove" onClick={() => removeGroup(group)} title="Remove">
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="no-groups-message">No grouping selected. Select fields below to add grouping.</div>
+            )}
+          </div>
+
+          <div className="available-groups">
+            <div className="available-groups-label">Add field to grouping:</div>
+            <div className="available-groups-list">
+              {availableGroups.map((group) => (
+                <button
+                  key={group.id}
+                  className={`available-group-btn ${activeGroups.includes(group.id) ? "disabled" : ""}`}
+                  onClick={() => addGroup(group.id)}
+                  disabled={activeGroups.includes(group.id)}
+                >
+                  + {group.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="filter-controls">
+          <h3>Filters</h3>
+          <div className="filter-dropdowns">
+            <CheckboxDropdown
+              label="ASV ID"
+              options={uniqueAsvs}
+              selectedOptions={asvFilters}
+              onChange={setAsvFilters}
+            />
+            <CheckboxDropdown
+              label="Repository"
+              options={uniqueRepos}
+              selectedOptions={repoFilters}
+              onChange={setRepoFilters}
+            />
+            <CheckboxDropdown
+              label="Service"
+              options={uniqueServices}
+              selectedOptions={serviceFilters}
+              onChange={setServiceFilters}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="table-wrapper">
+        <table className="pivot-table">
+          <thead>
+            <tr>
+              {activeGroups.length > 0
+                ? activeGroups.map((group, index) => (
+                    <th key={index} className="group-header">
+                      {availableGroups.find((g) => g.id === group)?.label || group.toUpperCase()}
+                    </th>
+                  ))
+                : Object.keys(flatData[0] || {}).map((field) => (
+                    <th key={field} className="group-header">
+                      {field.toUpperCase()}
+                    </th>
+                  ))}
+            </tr>
+          </thead>
+          <tbody>{renderRows(groupedData)}</tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
 
