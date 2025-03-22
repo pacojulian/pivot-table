@@ -291,37 +291,45 @@ export default function PivotTable() {
   }, [flatData, asvFilters, repoFilters, serviceFilters])
 
   // Group data for display based on active groups
-  const groupData = (data: FlattenedDataRow[]): GroupedData => {
-    if (activeGroups.length === 0) return { _rows: data, _isExpanded: true }
-
-    const grouped: GroupedData = {}
-
-    data.forEach((row) => {
-      let currentLevel: GroupNode = grouped as GroupNode
-
-      // Create nested structure based on active groups
-      activeGroups.forEach((group, index) => {
-        const groupValue = String(row[group])
-
-        if (!currentLevel[groupValue]) {
-          currentLevel[groupValue] = {
-            _isExpanded: index < 1, // Expand first level by default
-            _groupField: group,
-            _groupValue: groupValue,
-            _rows: [],
-          }
-        }
-
-        if (index === activeGroups.length - 1) {
-          ;(currentLevel[groupValue] as GroupNode)._rows.push(row)
-        }
-
-        currentLevel = currentLevel[groupValue] as GroupNode
-      })
-    })
-
-    return grouped
+const groupData = (data: FlattenedDataRow[]): GroupedData => {
+  if (activeGroups.length === 0) {
+    // Wrap the flat data in a special "_root" group to maintain GroupedData type
+    return {
+      "_root": {
+        _isExpanded: true,
+        _rows: data
+      }
+    };
   }
+
+  const grouped: GroupedData = {}
+
+  data.forEach((row) => {
+    let currentLevel: GroupNode = grouped as GroupNode
+
+    // Create nested structure based on active groups
+    activeGroups.forEach((group, index) => {
+      const groupValue = String(row[group])
+
+      if (!currentLevel[groupValue]) {
+        currentLevel[groupValue] = {
+          _isExpanded: index < 1, // Expand first level by default
+          _groupField: group,
+          _groupValue: groupValue,
+          _rows: [],
+        }
+      }
+
+      if (index === activeGroups.length - 1) {
+        (currentLevel[groupValue] as GroupNode)._rows.push(row)
+      }
+
+      currentLevel = currentLevel[groupValue] as GroupNode
+    })
+  })
+
+  return grouped
+}
 
   const groupedData = groupData(filteredData)
 
