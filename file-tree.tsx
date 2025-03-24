@@ -348,97 +348,100 @@ const groupData = (data: FlattenedDataRow[]): GroupedData => {
   }
 
   // Render table rows recursively
-  const renderRows = (
-    data: GroupedData | GroupNode,
-    path: string[] = [],
-    level = 0,
-    parentPath = "",
-  ): JSX.Element[] | null => {
-    if (!data) return null
+ const renderRows = (
+  data: GroupedData | GroupNode,
+  path: string[] = [],
+  level = 0,
+  parentPath = "",
+): JSX.Element[] | null => {
+  if (!data) return null;
 
-    if (level === 0 && activeGroups.length === 0) {
-      // If no grouping is selected, render flat data
-      return (data as GroupNode)._rows.map((row: FlattenedDataRow, index: number) => (
-        <tr key={`row-${index}`} className="data-row">
-          {Object.keys(row).map((field) => (
-            <td key={field}>{row[field as keyof FlattenedDataRow]}</td>
-          ))}
-        </tr>
-      ))
-    }
+  if (level === 0 && activeGroups.length === 0) {
+    // If no grouping is selected, render flat data
+    return (data as GroupNode)._rows.map((row: FlattenedDataRow, index: number) => (
+      <tr key={`row-${index}`} className="data-row">
+        {Object.keys(row).map((field) => (
+          <td key={field}>{row[field as keyof FlattenedDataRow]}</td>
+        ))}
+      </tr>
+    ));
+  }
 
-    const elements: JSX.Element[] = []
+  const elements: JSX.Element[] = [];
 
-    Object.keys(data)
-      .filter((key) => key !== "_isExpanded" && key !== "_rows" && key !== "_groupField" && key !== "_groupValue")
-      .forEach((key) => {
-        const currentPath = [...path, key]
-        const pathString = currentPath.join(".")
-        const parentPathString = parentPath ? parentPath : ""
-        const currentGroup = data[key] as GroupNode
+  Object.keys(data)
+    .filter((key) => key !== "_isExpanded" && key !== "_rows" && key !== "_groupField" && key !== "_groupValue")
+    .forEach((key) => {
+      const currentPath = [...path, key];
+      const pathString = currentPath.join(".");
+      const parentPathString = parentPath ? parentPath : "";
+      const currentGroup = data[key] as GroupNode;
 
-        // Group row
-        elements.push(
-          <tr
-            key={pathString}
-            className={`group-row level-${level} ${currentGroup._isExpanded ? "expanded" : ""}`}
-            data-path={pathString}
-            data-parent={parentPathString}
-            style={{ display: level === 0 || parentPathString === "" ? "table-row" : "none" }}
-          >
-            {activeGroups.map((group, i) => {
-              if (i === level) {
-                return (
-                  <td key={i} className="group-cell">
-                    <div className="expander-cell">
+      // Group row
+      elements.push(
+        <tr
+          key={pathString}
+          className={`group-row level-${level} ${currentGroup._isExpanded ? "expanded" : ""}`}
+          data-path={pathString}
+          data-parent={parentPathString}
+          style={{ display: level === 0 || parentPathString === "" ? "table-row" : "none" }}
+        >
+          {activeGroups.map((group, i) => {
+            if (i === level) {
+              return (
+                <td key={i} className="group-cell">
+                  <div className="expander-cell">
+                    {/* Only show expander if not at the last level */}
+                    {level < activeGroups.length - 1 && (
                       <button
                         className={`expander ${currentGroup._isExpanded ? "expanded" : ""}`}
                         onClick={() => toggleExpand(currentPath)}
                       ></button>
-                      <span>{key}</span>
-                    </div>
-                  </td>
-                )
-              } else if (i < level) {
-                return <td key={i} className="empty-cell"></td>
-              } else {
-                return <td key={i}></td>
-              }
-            })}
-          </tr>,
-        )
+                    )}
+                    <span>{key}</span>
+                  </div>
+                </td>
+              );
+            } else if (i < level) {
+              return <td key={i} className="empty-cell"></td>;
+            } else {
+              return <td key={i}></td>;
+            }
+          })}
+        </tr>
+      );
 
-        // If this is the last level, render the data rows
-        if (level === activeGroups.length - 1) {
-          currentGroup._rows.forEach((row: FlattenedDataRow, rowIndex: number) => {
-            elements.push(
-              <tr
-                key={`${pathString}-row-${rowIndex}`}
-                className="data-row"
-                data-parent={pathString}
-                style={{ display: currentGroup._isExpanded ? "table-row" : "none" }}
-              >
-                {activeGroups.map((group, i) => (
-                  <td key={i} className={i < level ? "empty-cell" : i === level ? "highlight-cell" : ""}>
-                    {i === level ? row[group] : ""}
-                  </td>
-                ))}
-              </tr>,
-            )
-          })
+      // If this is the last level, render the data rows
+      if (level === activeGroups.length - 1) {
+        currentGroup._rows.forEach((row: FlattenedDataRow, rowIndex: number) => {
+          elements.push(
+            <tr
+              key={`${pathString}-row-${rowIndex}`}
+              className="data-row"
+              data-parent={pathString}
+              style={{ display: currentGroup._isExpanded ? "table-row" : "none" }}
+            >
+              {activeGroups.map((group, i) => (
+                <td key={i} className={i < level ? "empty-cell" : ""}>
+                  {i === level ? row[group] : ""}
+                </td>
+              ))}
+            </tr>
+          );
+        });
+      }
+
+      // Render child groups
+      if (level < activeGroups.length - 1) {
+        const childElements = renderRows(currentGroup, currentPath, level + 1, pathString);
+        if (childElements) {
+          elements.push(...childElements);
         }
+      }
+    });
 
-        // Render child groups
-        if (level < activeGroups.length - 1) {
-          const childElements = renderRows(currentGroup, currentPath, level + 1, pathString)
-          if (childElements) {
-            elements.push(...childElements)
-          }
-        }
-      })
-
-    return elements
-  }
+  return elements;
+};
 
   // Handle drag start for a group item
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, index: number): void => {
