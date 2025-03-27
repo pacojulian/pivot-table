@@ -110,6 +110,69 @@ const sampleData: DataItem[] = [
   },
 ]
 
+// Drawer component for controls
+type DrawerProps = {
+  isOpen: boolean
+  onClose: () => void
+  children: React.ReactNode
+}
+
+const Drawer = ({ isOpen, onClose, children }: DrawerProps) => {
+  // Close drawer when clicking outside
+  const drawerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (drawerRef.current && !drawerRef.current.contains(event.target as Node) && isOpen) {
+        onClose()
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
+    }
+  }, [isOpen, onClose])
+
+  return (
+    <>
+      {/* Overlay */}
+      <div className={`drawer-overlay ${isOpen ? "active" : ""}`} onClick={onClose}></div>
+
+      {/* Drawer */}
+      <div className={`drawer ${isOpen ? "open" : ""}`} ref={drawerRef}>
+        <div className="drawer-header">
+          <h2>Pivot Table Controls</h2>
+          <button className="drawer-close" onClick={onClose}>
+            ×
+          </button>
+        </div>
+        <div className="drawer-content">{children}</div>
+      </div>
+    </>
+  )
+}
+
+// Filter panel component
+type FilterPanelProps = {
+  isOpen: boolean
+  onClose: () => void
+  children: React.ReactNode
+}
+
+const FilterPanel = ({ isOpen, onClose, children }: FilterPanelProps) => {
+  return (
+    <div className={`filter-panel ${isOpen ? "open" : ""}`}>
+      <div className="filter-panel-header">
+        <h3>Filters</h3>
+        <button className="filter-panel-close" onClick={onClose}>
+          ×
+        </button>
+      </div>
+      <div className="filter-panel-content">{children}</div>
+    </div>
+  )
+}
 // Flatten data for table display
 const flattenData = (data: DataItem[]): FlattenedDataRow[] => {
   const flatData: FlattenedDataRow[] = []
@@ -234,7 +297,10 @@ export default function PivotTable() {
   const [data] = useState<DataItem[]>(sampleData)
   const [flatData, setFlatData] = useState<FlattenedDataRow[]>([])
   const [filteredData, setFilteredData] = useState<FlattenedDataRow[]>([])
+  const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false)
+  const [isFilterPanelOpen, setIsFilterPanelOpen] = useState<boolean>(false)
 
+    
   // Available grouping fields
   const availableGroups: AvailableGroup[] = [
     { id: "asvId", label: "ASV ID" },
@@ -493,10 +559,45 @@ const groupData = (data: FlattenedDataRow[]): GroupedData => {
   const removeGroup = (groupId: keyof FlattenedDataRow): void => {
     setActiveGroups(activeGroups.filter((g) => g !== groupId))
   }
+// Toggle drawer
+  const toggleDrawer = () => {
+    setIsDrawerOpen(!isDrawerOpen)
+  }
 
+  // Toggle filter panel
+  const toggleFilterPanel = () => {
+    setIsFilterPanelOpen(!isFilterPanelOpen)
+  }
   return (
     <div className="pivot-table-container">
-      <div className="pivot-controls">
+      {/* Top toolbar with hamburger menu and filter button */}
+      <div className="pivot-toolbar">
+        <button className="hamburger-menu" onClick={toggleDrawer}>
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+        <h2 className="pivot-title">Pivot Table</h2>
+        <button className="filter-button" onClick={toggleFilterPanel}>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+          </svg>
+          Filters
+        </button>
+      </div>
+
+      {/* Drawer for row grouping controls */}
+      <Drawer isOpen={isDrawerOpen} onClose={() => setIsDrawerOpen(false)}>
         <div className="grouping-controls">
           <h3>Row Grouping</h3>
 
@@ -548,9 +649,11 @@ const groupData = (data: FlattenedDataRow[]): GroupedData => {
             </div>
           </div>
         </div>
+        </Drawer>
 
+       {/* Filter panel on the right */}
+      <FilterPanel isOpen={isFilterPanelOpen} onClose={() => setIsFilterPanelOpen(false)}>
         <div className="filter-controls">
-          <h3>Filters</h3>
           <div className="filter-dropdowns">
             <CheckboxDropdown
               label="ASV ID"
@@ -572,8 +675,7 @@ const groupData = (data: FlattenedDataRow[]): GroupedData => {
             />
           </div>
         </div>
-      </div>
-
+</FilterPanel>
       <div className="table-wrapper">
         <table className="pivot-table">
           <thead>
