@@ -58,9 +58,9 @@ type GroupNode = {
 const sampleData: DataItem[] = [
   {
     asv: {
-      id: "ASV-001",
+      id: "AllanFranciscoJulianNovoa",
       repo: {
-        name: "Repository A",
+        name: "AllanFranciscoJulian/AllanFrancisco",
         usecase: "Data Analysis",
         status: 200,
         services: [
@@ -110,69 +110,6 @@ const sampleData: DataItem[] = [
   },
 ]
 
-// Drawer component for controls
-type DrawerProps = {
-  isOpen: boolean
-  onClose: () => void
-  children: React.ReactNode
-}
-
-const Drawer = ({ isOpen, onClose, children }: DrawerProps) => {
-  // Close drawer when clicking outside
-  const drawerRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (drawerRef.current && !drawerRef.current.contains(event.target as Node) && isOpen) {
-        onClose()
-      }
-    }
-
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside)
-    }
-  }, [isOpen, onClose])
-
-  return (
-    <>
-      {/* Overlay */}
-      <div className={`drawer-overlay ${isOpen ? "active" : ""}`} onClick={onClose}></div>
-
-      {/* Drawer */}
-      <div className={`drawer ${isOpen ? "open" : ""}`} ref={drawerRef}>
-        <div className="drawer-header">
-          <h2>Pivot Table Controls</h2>
-          <button className="drawer-close" onClick={onClose}>
-            ×
-          </button>
-        </div>
-        <div className="drawer-content">{children}</div>
-      </div>
-    </>
-  )
-}
-
-// Filter panel component
-type FilterPanelProps = {
-  isOpen: boolean
-  onClose: () => void
-  children: React.ReactNode
-}
-
-const FilterPanel = ({ isOpen, onClose, children }: FilterPanelProps) => {
-  return (
-    <div className={`filter-panel ${isOpen ? "open" : ""}`}>
-      <div className="filter-panel-header">
-        <h3>Filters</h3>
-        <button className="filter-panel-close" onClick={onClose}>
-          ×
-        </button>
-      </div>
-      <div className="filter-panel-content">{children}</div>
-    </div>
-  )
-}
 // Flatten data for table display
 const flattenData = (data: DataItem[]): FlattenedDataRow[] => {
   const flatData: FlattenedDataRow[] = []
@@ -292,15 +229,34 @@ type AvailableGroup = {
   label: string
 }
 
+// Sidebar component for controls
+type SidebarProps = {
+  isOpen: boolean
+  onClose: () => void
+  children: React.ReactNode
+}
+
+const Sidebar = ({ isOpen, onClose, children }: SidebarProps) => {
+  return (
+    <div className={`sidebar ${isOpen ? "open" : ""}`}>
+      <div className="sidebar-header">
+        <h2>Pivot Table Controls</h2>
+        <button className="sidebar-close" onClick={onClose}>
+          ×
+        </button>
+      </div>
+      <div className="sidebar-content">{children}</div>
+    </div>
+  )
+}
+
 // Main Pivot Table Component
 export default function PivotTable() {
   const [data] = useState<DataItem[]>(sampleData)
   const [flatData, setFlatData] = useState<FlattenedDataRow[]>([])
   const [filteredData, setFilteredData] = useState<FlattenedDataRow[]>([])
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false)
-  const [isFilterPanelOpen, setIsFilterPanelOpen] = useState<boolean>(false)
 
-    
   // Available grouping fields
   const availableGroups: AvailableGroup[] = [
     { id: "asvId", label: "ASV ID" },
@@ -319,7 +275,7 @@ export default function PivotTable() {
     "attributeName",
   ])
 
-  // Filter states
+  // Filter states - initialize as empty arrays (nothing selected)
   const [asvFilters, setAsvFilters] = useState<string[]>([])
   const [repoFilters, setRepoFilters] = useState<string[]>([])
   const [serviceFilters, setServiceFilters] = useState<string[]>([])
@@ -339,63 +295,55 @@ export default function PivotTable() {
     setUniqueRepos(getUniqueValues(flattened, "repoName"))
     setUniqueServices(getUniqueValues(flattened, "serviceName"))
 
-    // Initialize filters with all values selected
-    setAsvFilters(getUniqueValues(flattened, "asvId") as string[])
-    setRepoFilters(getUniqueValues(flattened, "repoName") as string[])
-    setServiceFilters(getUniqueValues(flattened, "serviceName") as string[])
+    // Initialize filters with empty arrays (nothing selected)
+    setAsvFilters([])
+    setRepoFilters([])
+    setServiceFilters([])
   }, [data])
 
-  // Apply filters
+  // Apply filters - show all data when no filters are selected
   useEffect(() => {
     const filtered = flatData.filter(
       (item) =>
-        asvFilters.includes(item.asvId) &&
-        repoFilters.includes(item.repoName) &&
-        serviceFilters.includes(item.serviceName),
+        (asvFilters.length === 0 || asvFilters.includes(item.asvId)) &&
+        (repoFilters.length === 0 || repoFilters.includes(item.repoName)) &&
+        (serviceFilters.length === 0 || serviceFilters.includes(item.serviceName)),
     )
     setFilteredData(filtered)
   }, [flatData, asvFilters, repoFilters, serviceFilters])
 
   // Group data for display based on active groups
-const groupData = (data: FlattenedDataRow[]): GroupedData => {
-  if (activeGroups.length === 0) {
-    // Wrap the flat data in a special "_root" group to maintain GroupedData type
-    return {
-      "_root": {
-        _isExpanded: true,
-        _rows: data
-      }
-    };
-  }
+  const groupData = (data: FlattenedDataRow[]): GroupedData => {
+    if (activeGroups.length === 0) return { _rows: data, _isExpanded: true }
 
-  const grouped: GroupedData = {}
+    const grouped: GroupedData = {}
 
-  data.forEach((row) => {
-    let currentLevel: GroupNode = grouped as GroupNode
+    data.forEach((row) => {
+      let currentLevel: GroupNode = grouped as GroupNode
 
-    // Create nested structure based on active groups
-    activeGroups.forEach((group, index) => {
-      const groupValue = String(row[group])
+      // Create nested structure based on active groups
+      activeGroups.forEach((group, index) => {
+        const groupValue = String(row[group])
 
-      if (!currentLevel[groupValue]) {
-        currentLevel[groupValue] = {
-          _isExpanded: index < 1, // Expand first level by default
-          _groupField: group,
-          _groupValue: groupValue,
-          _rows: [],
+        if (!currentLevel[groupValue]) {
+          currentLevel[groupValue] = {
+            _isExpanded: index < 1, // Expand first level by default
+            _groupField: group,
+            _groupValue: groupValue,
+            _rows: [],
+          }
         }
-      }
 
-      if (index === activeGroups.length - 1) {
-        (currentLevel[groupValue] as GroupNode)._rows.push(row)
-      }
+        if (index === activeGroups.length - 1) {
+          ;(currentLevel[groupValue] as GroupNode)._rows.push(row)
+        }
 
-      currentLevel = currentLevel[groupValue] as GroupNode
+        currentLevel = currentLevel[groupValue] as GroupNode
+      })
     })
-  })
 
-  return grouped
-}
+    return grouped
+  }
 
   const groupedData = groupData(filteredData)
 
@@ -413,101 +361,100 @@ const groupData = (data: FlattenedDataRow[]): GroupedData => {
     }
   }
 
-  // Render table rows recursively
- const renderRows = (
-  data: GroupedData | GroupNode,
-  path: string[] = [],
-  level = 0,
-  parentPath = "",
-): JSX.Element[] | null => {
-  if (!data) return null;
+  const renderRows = (
+    data: GroupedData | GroupNode,
+    path: string[] = [],
+    level = 0,
+    parentPath = "",
+  ): React.JSX.Element[] | null => {
+    if (!data) return null
 
-  if (level === 0 && activeGroups.length === 0) {
-    // If no grouping is selected, render flat data
-    return (data as GroupNode)._rows.map((row: FlattenedDataRow, index: number) => (
-      <tr key={`row-${index}`} className="data-row">
-        {Object.keys(row).map((field) => (
-          <td key={field}>{row[field as keyof FlattenedDataRow]}</td>
-        ))}
-      </tr>
-    ));
-  }
-
-  const elements: JSX.Element[] = [];
-
-  Object.keys(data)
-    .filter((key) => key !== "_isExpanded" && key !== "_rows" && key !== "_groupField" && key !== "_groupValue")
-    .forEach((key) => {
-      const currentPath = [...path, key];
-      const pathString = currentPath.join(".");
-      const parentPathString = parentPath ? parentPath : "";
-      const currentGroup = data[key] as GroupNode;
-
-      // Group row
-      elements.push(
-        <tr
-          key={pathString}
-          className={`group-row level-${level} ${currentGroup._isExpanded ? "expanded" : ""}`}
-          data-path={pathString}
-          data-parent={parentPathString}
-          style={{ display: level === 0 || parentPathString === "" ? "table-row" : "none" }}
-        >
-          {activeGroups.map((group, i) => {
-            if (i === level) {
-              return (
-                <td key={i} className="group-cell">
-                  <div className="expander-cell">
-                    {/* Only show expander if not at the last level */}
-                    {level < activeGroups.length - 1 && (
-                      <button
-                        className={`expander ${currentGroup._isExpanded ? "expanded" : ""}`}
-                        onClick={() => toggleExpand(currentPath)}
-                      ></button>
-                    )}
-                    <span>{key}</span>
-                  </div>
-                </td>
-              );
-            } else if (i < level) {
-              return <td key={i} className="empty-cell"></td>;
-            } else {
-              return <td key={i}></td>;
-            }
-          })}
+    if (level === 0 && activeGroups.length === 0) {
+      // If no grouping is selected, render flat data
+      return (data as GroupNode)._rows.map((row: FlattenedDataRow, index: number) => (
+        <tr key={`row-${index}`} className="data-row">
+          {Object.keys(row).map((field) => (
+            <td key={field}>{row[field as keyof FlattenedDataRow]}</td>
+          ))}
         </tr>
-      );
+      ))
+    }
 
-      // If this is the last level, render the data rows
-      if (level === activeGroups.length - 1) {
-        currentGroup._rows.forEach((row: FlattenedDataRow, rowIndex: number) => {
-          elements.push(
-            <tr
-              key={`${pathString}-row-${rowIndex}`}
-              className="data-row"
-              data-parent={pathString}
-              style={{ display: currentGroup._isExpanded ? "table-row" : "none" }}
-            >
-              {activeGroups.map((group, i) => (
-                <td key={i} className={i < level ? "empty-cell" : ""}>
-                  {i === level ? row[group] : ""}
-                </td>
-              ))}
-            </tr>
-          );
-        });
-      }
+    const elements: React.JSX.Element[] = []
 
-      // Render child groups
-      if (level < activeGroups.length - 1) {
-        const childElements = renderRows(currentGroup, currentPath, level + 1, pathString);
-        if (childElements) {
-          elements.push(...childElements);
+    Object.keys(data)
+      .filter((key) => key !== "_isExpanded" && key !== "_rows" && key !== "_groupField" && key !== "_groupValue")
+      .forEach((key) => {
+        const currentPath = [...path, key]
+        const pathString = currentPath.join(".")
+        const parentPathString = parentPath ? parentPath : ""
+        const currentGroup = data[key] as GroupNode
+
+        // Group row
+        elements.push(
+          <tr
+            key={pathString}
+            className={`group-row level-${level} ${currentGroup._isExpanded ? "expanded" : ""}`}
+            data-path={pathString}
+            data-parent={parentPathString}
+            style={{ display: level === 0 || parentPathString === "" ? "table-row" : "none" }}
+          >
+            {activeGroups.map((group, i) => {
+              if (i === level) {
+                return (
+                  <td key={i} className="group-cell">
+                    <div className="expander-cell">
+                      {/* Only show expander if not at the last level */}
+                      {level < activeGroups.length - 1 && (
+                        <button
+                          className={`expander ${currentGroup._isExpanded ? "expanded" : ""}`}
+                          onClick={() => toggleExpand(currentPath)}
+                        ></button>
+                      )}
+                      <span>{key}</span>
+                    </div>
+                  </td>
+                )
+              } else if (i < level) {
+                return <td key={i} className="empty-cell"></td>
+              } else {
+                return <td key={i}></td>
+              }
+            })}
+          </tr>,
+        )
+
+        // If this is the last level, render the data rows
+        if (level === activeGroups.length - 1) {
+          currentGroup._rows.forEach((row: FlattenedDataRow, rowIndex: number) => {
+            elements.push(
+              <tr
+                key={`${pathString}-row-${rowIndex}`}
+                className="data-row"
+                data-parent={pathString}
+                style={{ display: currentGroup._isExpanded ? "table-row" : "none" }}
+              >
+                {activeGroups.map((group, i) => (
+                  <td key={i} className={i < level ? "empty-cell" : ""}>
+                    {i === level ? row[group] : ""}
+                  </td>
+                ))}
+              </tr>,
+            )
+          })
         }
-      }
-    });
 
-  return elements;
-};
+        // Render child groups
+        if (level < activeGroups.length - 1) {
+          const childElements = renderRows(currentGroup, currentPath, level + 1, pathString)
+          if (childElements) {
+            elements.push(...childElements)
+          }
+        }
+      })
+
+    return elements
+  }
 
   // Handle drag start for a group item
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, index: number): void => {
@@ -559,18 +506,21 @@ const groupData = (data: FlattenedDataRow[]): GroupedData => {
   const removeGroup = (groupId: keyof FlattenedDataRow): void => {
     setActiveGroups(activeGroups.filter((g) => g !== groupId))
   }
-// Toggle drawer
+
+  // Determine which filters to show (exclude the last active group)
+  const lastActiveGroup = activeGroups.length > 0 ? activeGroups[activeGroups.length - 1] : null
+  const showAsvFilter = activeGroups.includes("asvId") && lastActiveGroup !== "asvId"
+  const showRepoFilter = activeGroups.includes("repoName") && lastActiveGroup !== "repoName"
+  const showServiceFilter = activeGroups.includes("serviceName") && lastActiveGroup !== "serviceName"
+
+  // Toggle drawer
   const toggleDrawer = () => {
     setIsDrawerOpen(!isDrawerOpen)
   }
 
-  // Toggle filter panel
-  const toggleFilterPanel = () => {
-    setIsFilterPanelOpen(!isFilterPanelOpen)
-  }
   return (
-    <div className="pivot-table-container">
-      {/* Top toolbar with hamburger menu and filter button */}
+    <div className={`pivot-table-container ${isDrawerOpen ? "sidebar-open" : ""}`}>
+      {/* Top toolbar with hamburger menu */}
       <div className="pivot-toolbar">
         <button className="hamburger-menu" onClick={toggleDrawer}>
           <span></span>
@@ -578,123 +528,121 @@ const groupData = (data: FlattenedDataRow[]): GroupedData => {
           <span></span>
         </button>
         <h2 className="pivot-title">Pivot Table</h2>
-        <button className="filter-button" onClick={toggleFilterPanel}>
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
-          </svg>
-          Filters
-        </button>
       </div>
 
-      {/* Drawer for row grouping controls */}
-      <Drawer isOpen={isDrawerOpen} onClose={() => setIsDrawerOpen(false)}>
-        <div className="grouping-controls">
-          <h3>Row Grouping</h3>
+      <div className="main-content">
+        {/* Sidebar for controls */}
+        <Sidebar isOpen={isDrawerOpen} onClose={() => setIsDrawerOpen(false)}>
+          <div className="grouping-controls">
+            <h3>Row Grouping</h3>
 
-          <div className="grouping-explanation">
-            <p>Drag and drop to reorder. The order determines the hierarchy of your data grouping.</p>
-          </div>
+            <div className="grouping-explanation">
+              <p>Drag and drop to reorder. The order determines the hierarchy of your data grouping.</p>
+            </div>
 
-          <div className="active-groups">
-            {activeGroups.length > 0 ? (
-              <div className="active-groups-list">
-                {activeGroups.map((group, index) => (
-                  <div
-                    key={String(group)}
-                    className="group-pill"
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, index)}
-                    onDragOver={handleDragOver}
-                    onDragLeave={handleDragLeave}
-                    onDrop={(e) => handleDrop(e, index)}
-                    onDragEnd={handleDragEnd}
+            <div className="active-groups">
+              {activeGroups.length > 0 ? (
+                <div className="active-groups-list">
+                  {activeGroups.map((group, index) => (
+                    <div
+                      key={String(group)}
+                      className="group-pill"
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, index)}
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => handleDrop(e, index)}
+                      onDragEnd={handleDragEnd}
+                    >
+                      <span className="group-pill-text">
+                        {index + 1}. {availableGroups.find((g) => g.id === group)?.label}
+                      </span>
+                      <button className="group-pill-remove" onClick={() => removeGroup(group)} title="Remove">
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="no-groups-message">No grouping selected. Select fields below to add grouping.</div>
+              )}
+            </div>
+
+            <div className="available-groups">
+              <div className="available-groups-label">Add field to grouping:</div>
+              <div className="available-groups-list">
+                {availableGroups.map((group) => (
+                  <button
+                    key={String(group.id)}
+                    className={`available-group-btn ${activeGroups.includes(group.id) ? "disabled" : ""}`}
+                    onClick={() => addGroup(group.id)}
+                    disabled={activeGroups.includes(group.id)}
                   >
-                    <span className="group-pill-text">
-                      {index + 1}. {availableGroups.find((g) => g.id === group)?.label}
-                    </span>
-                    <button className="group-pill-remove" onClick={() => removeGroup(group)} title="Remove">
-                      ×
-                    </button>
-                  </div>
+                    + {group.label}
+                  </button>
                 ))}
               </div>
-            ) : (
-              <div className="no-groups-message">No grouping selected. Select fields below to add grouping.</div>
-            )}
-          </div>
-
-          <div className="available-groups">
-            <div className="available-groups-label">Add field to grouping:</div>
-            <div className="available-groups-list">
-              {availableGroups.map((group) => (
-                <button
-                  key={String(group.id)}
-                  className={`available-group-btn ${activeGroups.includes(group.id) ? "disabled" : ""}`}
-                  onClick={() => addGroup(group.id)}
-                  disabled={activeGroups.includes(group.id)}
-                >
-                  + {group.label}
-                </button>
-              ))}
             </div>
           </div>
-        </div>
-        </Drawer>
 
-       {/* Filter panel on the right */}
-      <FilterPanel isOpen={isFilterPanelOpen} onClose={() => setIsFilterPanelOpen(false)}>
-        <div className="filter-controls">
-          <div className="filter-dropdowns">
-            <CheckboxDropdown
-              label="ASV ID"
-              options={uniqueAsvs}
-              selectedOptions={asvFilters}
-              onChange={setAsvFilters}
-            />
-            <CheckboxDropdown
-              label="Repository"
-              options={uniqueRepos}
-              selectedOptions={repoFilters}
-              onChange={setRepoFilters}
-            />
-            <CheckboxDropdown
-              label="Service"
-              options={uniqueServices}
-              selectedOptions={serviceFilters}
-              onChange={setServiceFilters}
-            />
+          <div className="filter-controls">
+            <h3>Filters</h3>
+            <div className="filter-dropdowns">
+              {showAsvFilter && (
+                <CheckboxDropdown
+                  label="ASV ID"
+                  options={uniqueAsvs}
+                  selectedOptions={asvFilters}
+                  onChange={setAsvFilters}
+                />
+              )}
+              {showRepoFilter && (
+                <CheckboxDropdown
+                  label="Repository"
+                  options={uniqueRepos}
+                  selectedOptions={repoFilters}
+                  onChange={setRepoFilters}
+                />
+              )}
+              {showServiceFilter && (
+                <CheckboxDropdown
+                  label="Service"
+                  options={uniqueServices}
+                  selectedOptions={serviceFilters}
+                  onChange={setServiceFilters}
+                />
+              )}
+            </div>
+          </div>
+        </Sidebar>
+
+        {/* Main table area */}
+        <div className="table-container">
+          <div className="table-wrapper">
+            <table className="pivot-table">
+              <thead>
+                <tr>
+                  {activeGroups.length > 0
+                    ? activeGroups.map((group, index) => (
+                        <th key={index} className="group-header">
+                          {availableGroups.find((g) => g.id === group)?.label || String(group).toUpperCase()}
+                        </th>
+                      ))
+                    : Object.keys(flatData[0] || {}).map((field) => (
+                        <th key={field} className="group-header">
+                          {field.toUpperCase()}
+                        </th>
+                      ))}
+                </tr>
+              </thead>
+              <tbody>{renderRows(groupedData)}</tbody>
+            </table>
+
+            {filteredData.length === 0 && (
+              <div className="no-data-message">No data available. Please adjust your filters.</div>
+            )}
           </div>
         </div>
-</FilterPanel>
-      <div className="table-wrapper">
-        <table className="pivot-table">
-          <thead>
-            <tr>
-              {activeGroups.length > 0
-                ? activeGroups.map((group, index) => (
-                    <th key={index} className="group-header">
-                      {availableGroups.find((g) => g.id === group)?.label || String(group).toUpperCase()}
-                    </th>
-                  ))
-                : Object.keys(flatData[0] || {}).map((field) => (
-                    <th key={field} className="group-header">
-                      {field.toUpperCase()}
-                    </th>
-                  ))}
-            </tr>
-          </thead>
-          <tbody>{renderRows(groupedData)}</tbody>
-        </table>
       </div>
     </div>
   )
