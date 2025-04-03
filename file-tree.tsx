@@ -1,4 +1,3 @@
-"use client"
 
 import { useState, useEffect, useRef } from "react"
 import "./pivot-table.css"
@@ -148,17 +147,24 @@ type CheckboxDropdownProps = {
   options: string[]
   selectedOptions: string[]
   onChange: (selected: string[]) => void
+  anchorRef: React.RefObject<HTMLElement>
 }
 
 // Component for custom checkbox dropdown with search
-const CheckboxDropdown = ({ label, options, selectedOptions, onChange }: CheckboxDropdownProps) => {
+const CheckboxDropdown = ({ label, options, selectedOptions, onChange, anchorRef }: CheckboxDropdownProps) => {
   const [isOpen, setIsOpen] = useState<boolean>(false)
   const [searchTerm, setSearchTerm] = useState<string>("")
+  const [popoverPosition, setPopoverPosition] = useState({ top: 0, left: 0 })
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node) &&
+        anchorRef.current &&
+        !anchorRef.current.contains(event.target as Node)
+      ) {
         setIsOpen(false)
       }
     }
@@ -167,7 +173,31 @@ const CheckboxDropdown = ({ label, options, selectedOptions, onChange }: Checkbo
     return () => {
       document.removeEventListener("mousedown", handleClickOutside)
     }
-  }, [])
+  }, [anchorRef])
+
+  // Calculate popover position when opening
+  useEffect(() => {
+    if (isOpen && anchorRef.current) {
+      const rect = anchorRef.current.getBoundingClientRect()
+      const tableContainer = document.querySelector(".table-wrapper")
+      const tableRect = tableContainer?.getBoundingClientRect() || { left: 0, right: window.innerWidth }
+
+      // Position the dropdown below the header
+      let left = rect.left
+      const top = rect.bottom + window.scrollY
+
+      // Ensure the dropdown doesn't go off-screen to the right
+      const dropdownWidth = 280
+      if (left + dropdownWidth > tableRect.right) {
+        left = Math.max(tableRect.left, rect.right - dropdownWidth)
+      }
+
+      setPopoverPosition({
+        top,
+        left,
+      })
+    }
+  }, [isOpen, anchorRef])
 
   const handleToggle = (option: string) => {
     if (selectedOptions.includes(option)) {
@@ -185,18 +215,36 @@ const CheckboxDropdown = ({ label, options, selectedOptions, onChange }: Checkbo
     }
   }
 
-  const filteredOptions = options.filter((option) => option.toLowerCase().includes(searchTerm.toLowerCase()))
+  const filteredOptions = options.filter((option) => String(option).toLowerCase().includes(searchTerm.toLowerCase()))
+
+  const toggleDropdown = () => {
+    setIsOpen(!isOpen)
+    if (!isOpen) {
+      setSearchTerm("")
+    }
+  }
 
   return (
-    <div className="checkbox-dropdown" ref={dropdownRef}>
-      <div className="dropdown-header" onClick={() => setIsOpen(!isOpen)}>
-        <span>
-          {label} ({selectedOptions.length}/{options.length})
-        </span>
-        <span className={`dropdown-arrow ${isOpen ? "open" : ""}`}></span>
-      </div>
+    <>
+      <button className="column-filter-button" onClick={toggleDropdown} title={`Filter ${label}`}>
+        <span className={`filter-icon ${selectedOptions.length > 0 ? "active" : ""}`}></span>
+      </button>
+
       {isOpen && (
-        <div className="dropdown-content">
+        <div
+          className="dropdown-popover"
+          ref={dropdownRef}
+          style={{
+            top: `${popoverPosition.top}px`,
+            left: `${popoverPosition.left}px`,
+          }}
+        >
+          <div className="popover-header">
+            <h4>{label} Filter</h4>
+            <button className="popover-close" onClick={() => setIsOpen(false)}>
+              ×
+            </button>
+          </div>
           <div className="dropdown-search">
             <input
               type="text"
@@ -206,19 +254,52 @@ const CheckboxDropdown = ({ label, options, selectedOptions, onChange }: Checkbo
               onClick={(e) => e.stopPropagation()}
             />
           </div>
-          <label className="checkbox-item">
-            <input type="checkbox" checked={selectedOptions.length === options.length} onChange={toggleAll} />
-            <span className="checkbox-label">Select All</span>
-          </label>
-          {filteredOptions.map((option) => (
-            <label key={option} className="checkbox-item">
-              <input type="checkbox" checked={selectedOptions.includes(option)} onChange={() => handleToggle(option)} />
-              <span className="checkbox-label">{option}</span>
+          <div className="dropdown-options">
+            <label className="checkbox-item">
+              <input type="checkbox" checked={selectedOptions.length === options.length} onChange={toggleAll} />
+              <span className="checkbox-label">Select All</span>
             </label>
-          ))}
-          {filteredOptions.length === 0 && <div className="no-results">No matching options</div>}
+            {filteredOptions.map((option) => (
+              <label key={String(option)} className="checkbox-item">
+                <input
+                  type="checkbox"
+                  checked={selectedOptions.includes(String(option))}
+                  onChange={() => handleToggle(String(option))}
+                />
+                <span className="checkbox-label">{String(option)}</span>
+              </label>
+            ))}
+            {filteredOptions.length === 0 && <div className="no-results">No matching options</div>}
+          </div>
         </div>
       )}
+    </>
+  )
+}
+
+// Type for column header props
+type ColumnHeaderProps = {
+  field: keyof FlattenedDataRow
+  label: string
+  uniqueValues: string[]
+  selectedFilters: string[]
+  onFilterChange: (field: keyof FlattenedDataRow, selected: string[]) => void
+}
+
+// Column header component with filter
+const ColumnHeader = ({ field, label, uniqueValues, selectedFilters, onFilterChange }: ColumnHeaderProps) => {
+  const headerRef = useRef<HTMLDivElement>(null)
+
+  return (
+    <div className="column-header" ref={headerRef}>
+      <span className="column-title">{label}</span>
+      <CheckboxDropdown
+        label={label}
+        options={uniqueValues}
+        selectedOptions={selectedFilters}
+        onChange={(selected) => onFilterChange(field, selected)}
+        anchorRef={headerRef}
+      />
     </div>
   )
 }
@@ -275,15 +356,25 @@ export default function PivotTable() {
     "attributeName",
   ])
 
-  // Filter states - initialize as empty arrays (nothing selected)
-  const [asvFilters, setAsvFilters] = useState<string[]>([])
-  const [repoFilters, setRepoFilters] = useState<string[]>([])
-  const [serviceFilters, setServiceFilters] = useState<string[]>([])
+  // Filter states for all columns
+  const [columnFilters, setColumnFilters] = useState<Record<keyof FlattenedDataRow, string[]>>({
+    asvId: [],
+    repoName: [],
+    repoUsecase: [],
+    repoStatus: [],
+    serviceName: [],
+    attributeName: [],
+  })
 
-  // Unique values for filters
-  const [uniqueAsvs, setUniqueAsvs] = useState<string[]>([])
-  const [uniqueRepos, setUniqueRepos] = useState<string[]>([])
-  const [uniqueServices, setUniqueServices] = useState<string[]>([])
+  // Unique values for each column
+  const [uniqueColumnValues, setUniqueColumnValues] = useState<Record<keyof FlattenedDataRow, string[]>>({
+    asvId: [],
+    repoName: [],
+    repoUsecase: [],
+    repoStatus: [],
+    serviceName: [],
+    attributeName: [],
+  })
 
   // Initialize data
   useEffect(() => {
@@ -291,26 +382,49 @@ export default function PivotTable() {
     setFlatData(flattened)
     setFilteredData(flattened)
 
-    setUniqueAsvs(getUniqueValues(flattened, "asvId"))
-    setUniqueRepos(getUniqueValues(flattened, "repoName"))
-    setUniqueServices(getUniqueValues(flattened, "serviceName"))
+    // Get unique values for all columns
+    const uniqueValues: Partial<Record<keyof FlattenedDataRow, string[]>> = {}
 
-    // Initialize filters with empty arrays (nothing selected)
-    setAsvFilters([])
-    setRepoFilters([])
-    setServiceFilters([])
+    Object.keys(flattened[0] || {}).forEach((field) => {
+      const fieldKey = field as keyof FlattenedDataRow
+      uniqueValues[fieldKey] = getUniqueValues(flattened, fieldKey).map((val) => String(val))
+    })
+
+    setUniqueColumnValues(uniqueValues as Record<keyof FlattenedDataRow, string[]>)
+
+    // Initialize all filters as empty arrays
+    const initialFilters: Partial<Record<keyof FlattenedDataRow, string[]>> = {}
+    Object.keys(flattened[0] || {}).forEach((field) => {
+      initialFilters[field as keyof FlattenedDataRow] = []
+    })
+
+    setColumnFilters(initialFilters as Record<keyof FlattenedDataRow, string[]>)
   }, [data])
 
-  // Apply filters - show all data when no filters are selected
+  // Apply filters
   useEffect(() => {
-    const filtered = flatData.filter(
-      (item) =>
-        (asvFilters.length === 0 || asvFilters.includes(item.asvId)) &&
-        (repoFilters.length === 0 || repoFilters.includes(item.repoName)) &&
-        (serviceFilters.length === 0 || serviceFilters.includes(item.serviceName)),
-    )
+    const filtered = flatData.filter((item) => {
+      // Check each active filter
+      return Object.entries(columnFilters).every(([field, selectedValues]) => {
+        // If no values are selected for this field, don't filter on it
+        if (selectedValues.length === 0) return true
+
+        // Otherwise, check if the item's value for this field is in the selected values
+        const fieldValue = String(item[field as keyof FlattenedDataRow])
+        return selectedValues.includes(fieldValue)
+      })
+    })
+
     setFilteredData(filtered)
-  }, [flatData, asvFilters, repoFilters, serviceFilters])
+  }, [flatData, columnFilters])
+
+  // Update a specific column filter
+  const updateColumnFilter = (field: keyof FlattenedDataRow, selected: string[]) => {
+    setColumnFilters((prev) => ({
+      ...prev,
+      [field]: selected,
+    }))
+  }
 
   // Group data for display based on active groups
   const groupData = (data: FlattenedDataRow[]): GroupedData => {
@@ -507,12 +621,6 @@ export default function PivotTable() {
     setActiveGroups(activeGroups.filter((g) => g !== groupId))
   }
 
-  // Determine which filters to show (exclude the last active group)
-  const lastActiveGroup = activeGroups.length > 0 ? activeGroups[activeGroups.length - 1] : null
-  const showAsvFilter = activeGroups.includes("asvId") && lastActiveGroup !== "asvId"
-  const showRepoFilter = activeGroups.includes("repoName") && lastActiveGroup !== "repoName"
-  const showServiceFilter = activeGroups.includes("serviceName") && lastActiveGroup !== "serviceName"
-
   // Toggle drawer
   const toggleDrawer = () => {
     setIsDrawerOpen(!isDrawerOpen)
@@ -584,36 +692,6 @@ export default function PivotTable() {
               </div>
             </div>
           </div>
-
-          <div className="filter-controls">
-            <h3>Filters</h3>
-            <div className="filter-dropdowns">
-              {showAsvFilter && (
-                <CheckboxDropdown
-                  label="ASV ID"
-                  options={uniqueAsvs}
-                  selectedOptions={asvFilters}
-                  onChange={setAsvFilters}
-                />
-              )}
-              {showRepoFilter && (
-                <CheckboxDropdown
-                  label="Repository"
-                  options={uniqueRepos}
-                  selectedOptions={repoFilters}
-                  onChange={setRepoFilters}
-                />
-              )}
-              {showServiceFilter && (
-                <CheckboxDropdown
-                  label="Service"
-                  options={uniqueServices}
-                  selectedOptions={serviceFilters}
-                  onChange={setServiceFilters}
-                />
-              )}
-            </div>
-          </div>
         </Sidebar>
 
         {/* Main table area */}
@@ -623,16 +701,34 @@ export default function PivotTable() {
               <thead>
                 <tr>
                   {activeGroups.length > 0
-                    ? activeGroups.map((group, index) => (
-                        <th key={index} className="group-header">
-                          {availableGroups.find((g) => g.id === group)?.label || String(group).toUpperCase()}
-                        </th>
-                      ))
-                    : Object.keys(flatData[0] || {}).map((field) => (
-                        <th key={field} className="group-header">
-                          {field.toUpperCase()}
-                        </th>
-                      ))}
+                    ? activeGroups.map((group, index) => {
+                        const label = availableGroups.find((g) => g.id === group)?.label || String(group).toUpperCase()
+                        return (
+                          <th key={index} className="group-header">
+                            <ColumnHeader
+                              field={group}
+                              label={label}
+                              uniqueValues={uniqueColumnValues[group] || []}
+                              selectedFilters={columnFilters[group] || []}
+                              onFilterChange={updateColumnFilter}
+                            />
+                          </th>
+                        )
+                      })
+                    : Object.keys(flatData[0] || {}).map((field) => {
+                        const fieldKey = field as keyof FlattenedDataRow
+                        return (
+                          <th key={field} className="group-header">
+                            <ColumnHeader
+                              field={fieldKey}
+                              label={field.toUpperCase()}
+                              uniqueValues={uniqueColumnValues[fieldKey] || []}
+                              selectedFilters={columnFilters[fieldKey] || []}
+                              onFilterChange={updateColumnFilter}
+                            />
+                          </th>
+                        )
+                      })}
                 </tr>
               </thead>
               <tbody>{renderRows(groupedData)}</tbody>
