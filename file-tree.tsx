@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import "./pivot-table.css"
 import type React from "react"
 
@@ -11,14 +11,14 @@ type AttributeData = {
 
 type ServiceData = {
   name: string
-  attributes: AttributeData[]
+  attributes?: AttributeData[] // Optional as they will be loaded on demand
 }
 
 type RepoData = {
   name: string
   usecase: string
   status: number
-  services: ServiceData[]
+  services?: ServiceData[] // Optional as they will be loaded on demand
 }
 
 type ASVData = {
@@ -36,8 +36,8 @@ type FlattenedDataRow = {
   repoName: string
   repoUsecase: string
   repoStatus: number
-  serviceName: string
-  attributeName: string
+  serviceName?: string
+  attributeName?: string
 }
 
 // Define the grouped data structure
@@ -53,8 +53,8 @@ type GroupNode = {
   [key: string]: GroupNode | FlattenedDataRow[] | boolean | string | undefined
 }
 
-// Sample data based on the provided structure
-const sampleData: DataItem[] = [
+// Sample initial data with only ASV and Repository information
+const initialData: DataItem[] = [
   {
     asv: {
       id: "AllanFranciscoJulianNovoa",
@@ -62,12 +62,7 @@ const sampleData: DataItem[] = [
         name: "AllanFranciscoJulian/AllanFrancisco",
         usecase: "Data Analysis",
         status: 200,
-        services: [
-          {
-            name: "cch",
-            attributes: [{ "attribute-name": "accountReferenceId" }, { "attribute-name": "accountName" }],
-          },
-        ],
+        services: [], // Empty array instead of undefined
       },
     },
   },
@@ -78,12 +73,7 @@ const sampleData: DataItem[] = [
         name: "Repository B",
         usecase: "Reporting",
         status: 200,
-        services: [
-          {
-            name: "reporting",
-            attributes: [{ "attribute-name": "reportId" }, { "attribute-name": "reportName" }],
-          },
-        ],
+        services: [], // Empty array instead of undefined
       },
     },
   },
@@ -94,20 +84,71 @@ const sampleData: DataItem[] = [
         name: "Repository A",
         usecase: "Analytics",
         status: 404,
-        services: [
-          {
-            name: "analytics",
-            attributes: [{ "attribute-name": "metricId" }, { "attribute-name": "metricValue" }],
-          },
-          {
-            name: "dashboard",
-            attributes: [{ "attribute-name": "dashboardId" }, { "attribute-name": "dashboardName" }],
-          },
-        ],
+        services: [], // Empty array instead of undefined
+      },
+    },
+  },
+  {
+    asv: {
+      id: "ASV-004",
+      repo: {
+        name: "Repository C",
+        usecase: "Monitoring",
+        status: 200,
+        services: [], // Empty array instead of undefined
+      },
+    },
+  },
+  {
+    asv: {
+      id: "ASV-005",
+      repo: {
+        name: "Repository D",
+        usecase: "Data Processing",
+        status: 200,
+        services: [], // Empty array instead of undefined
       },
     },
   },
 ]
+
+// Mock service data for API responses
+const mockServiceData: Record<string, ServiceData[]> = {
+  "AllanFranciscoJulian/AllanFrancisco": [{ name: "cch" }, { name: "auth" }],
+  "Repository A": [{ name: "analytics" }, { name: "dashboard" }],
+  "Repository B": [{ name: "reporting" }, { name: "export" }],
+  "Repository C": [{ name: "monitoring" }, { name: "alerts" }],
+  "Repository D": [{ name: "processing" }, { name: "transformation" }],
+}
+
+// Mock attribute data for API responses
+const mockAttributeData: Record<string, AttributeData[]> = {
+  cch: [{ "attribute-name": "accountReferenceId" }, { "attribute-name": "accountName" }],
+  auth: [{ "attribute-name": "userId" }, { "attribute-name": "userRole" }],
+  analytics: [{ "attribute-name": "metricId" }, { "attribute-name": "metricValue" }],
+  dashboard: [{ "attribute-name": "dashboardId" }, { "attribute-name": "dashboardName" }],
+  reporting: [{ "attribute-name": "reportId" }, { "attribute-name": "reportName" }],
+  export: [{ "attribute-name": "exportFormat" }, { "attribute-name": "exportTimestamp" }],
+  monitoring: [{ "attribute-name": "monitorId" }, { "attribute-name": "monitorStatus" }],
+  alerts: [{ "attribute-name": "alertId" }, { "attribute-name": "alertSeverity" }],
+  processing: [{ "attribute-name": "processId" }, { "attribute-name": "processStatus" }],
+  transformation: [{ "attribute-name": "transformId" }, { "attribute-name": "transformType" }],
+}
+
+// Mock API functions
+const fetchServices = async (asvId: string, repoName: string): Promise<ServiceData[]> => {
+  console.log(`Fetching services for ASV: ${asvId}, Repository: ${repoName}`)
+  // Simulate network delay
+  await new Promise((resolve) => setTimeout(resolve, 500))
+  return mockServiceData[repoName] || []
+}
+
+const fetchAttributes = async (asvId: string, repoName: string, serviceName: string): Promise<AttributeData[]> => {
+  console.log(`Fetching attributes for ASV: ${asvId}, Repository: ${repoName}, Service: ${serviceName}`)
+  // Simulate network delay
+  await new Promise((resolve) => setTimeout(resolve, 500))
+  return mockAttributeData[serviceName] || []
+}
 
 // Flatten data for table display
 const flattenData = (data: DataItem[]): FlattenedDataRow[] => {
@@ -117,19 +158,43 @@ const flattenData = (data: DataItem[]): FlattenedDataRow[] => {
     const asv = item.asv
     const repo = asv.repo
 
-    repo.services.forEach((service) => {
-      service.attributes.forEach((attr) => {
-        const row: FlattenedDataRow = {
-          asvId: asv.id,
-          repoName: repo.name,
-          repoUsecase: repo.usecase,
-          repoStatus: repo.status,
-          serviceName: service.name,
-          attributeName: attr["attribute-name"],
+    if (!repo.services || repo.services.length === 0) {
+      // If no services, add a row with just ASV and Repo data, but include an empty serviceName
+      const row: FlattenedDataRow = {
+        asvId: asv.id,
+        repoName: repo.name,
+        repoUsecase: repo.usecase,
+        repoStatus: repo.status,
+        serviceName: "", // Include empty serviceName to maintain column structure
+      }
+      flatData.push(row)
+    } else {
+      repo.services.forEach((service) => {
+        if (!service.attributes || service.attributes.length === 0) {
+          // If no attributes, just add up to service level
+          const row: FlattenedDataRow = {
+            asvId: asv.id,
+            repoName: repo.name,
+            repoUsecase: repo.usecase,
+            repoStatus: repo.status,
+            serviceName: service.name,
+          }
+          flatData.push(row)
+        } else {
+          service.attributes.forEach((attr) => {
+            const row: FlattenedDataRow = {
+              asvId: asv.id,
+              repoName: repo.name,
+              repoUsecase: repo.usecase,
+              repoStatus: repo.status,
+              serviceName: service.name,
+              attributeName: attr["attribute-name"],
+            }
+            flatData.push(row)
+          })
         }
-        flatData.push(row)
       })
-    })
+    }
   })
 
   return flatData
@@ -137,7 +202,7 @@ const flattenData = (data: DataItem[]): FlattenedDataRow[] => {
 
 // Get unique values for filters
 const getUniqueValues = <T extends object, K extends keyof T>(data: T[], field: K): Array<T[K]> => {
-  const values = new Set(data.map((item) => item[field]))
+  const values = new Set(data.map((item) => item[field]).filter(Boolean))
   return Array.from(values)
 }
 
@@ -331,29 +396,46 @@ const Sidebar = ({ isOpen, onClose, children }: SidebarProps) => {
   )
 }
 
+// Loading indicator component
+const LoadingIndicator = ({ message = "Loading..." }: { message?: string }) => {
+  return (
+    <div className="loading-indicator">
+      <div className="spinner"></div>
+      <div className="loading-message">{message}</div>
+    </div>
+  )
+}
+
 // Main Pivot Table Component
 export default function PivotTable() {
-  const [data] = useState<DataItem[]>(sampleData)
+  // Data states
+  const [data, setData] = useState<DataItem[]>(initialData)
   const [flatData, setFlatData] = useState<FlattenedDataRow[]>([])
   const [filteredData, setFilteredData] = useState<FlattenedDataRow[]>([])
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false)
 
-  // Available grouping fields
-  const availableGroups: AvailableGroup[] = [
+  // Loading states
+  const [loadingServices, setLoadingServices] = useState<boolean>(false)
+  const [loadingAttributes, setLoadingAttributes] = useState<boolean>(false)
+
+  // Track expanded state for repositories and services
+  const [expandedRepos, setExpandedRepos] = useState<Set<string>>(new Set())
+  const [expandedServices, setExpandedServices] = useState<Set<string>>(new Set())
+
+  // Available grouping fields - initially only ASV and Repository
+  const [availableGroups, setAvailableGroups] = useState<AvailableGroup[]>([
     { id: "asvId", label: "ASV ID" },
     { id: "repoName", label: "Repository Name" },
     { id: "repoUsecase", label: "Repository Usecase" },
     { id: "repoStatus", label: "Repository Status" },
-    { id: "serviceName", label: "Service Name" },
-    { id: "attributeName", label: "Attribute Name" },
-  ]
+    { id: "serviceName", label: "Service Name" }, // Include Service Name from the start
+  ])
 
   // Grouping state - ordered list of selected groups
   const [activeGroups, setActiveGroups] = useState<Array<keyof FlattenedDataRow>>([
     "asvId",
     "repoName",
-    "serviceName",
-    "attributeName",
+    "serviceName", // Include Service Name from the start
   ])
 
   // Filter states for all columns
@@ -382,7 +464,7 @@ export default function PivotTable() {
     setFlatData(flattened)
     setFilteredData(flattened)
 
-    // Get unique values for all columns
+    // Extract unique values for filters
     const uniqueValues: Partial<Record<keyof FlattenedDataRow, string[]>> = {}
 
     Object.keys(flattened[0] || {}).forEach((field) => {
@@ -390,15 +472,10 @@ export default function PivotTable() {
       uniqueValues[fieldKey] = getUniqueValues(flattened, fieldKey).map((val) => String(val))
     })
 
-    setUniqueColumnValues(uniqueValues as Record<keyof FlattenedDataRow, string[]>)
-
-    // Initialize all filters as empty arrays
-    const initialFilters: Partial<Record<keyof FlattenedDataRow, string[]>> = {}
-    Object.keys(flattened[0] || {}).forEach((field) => {
-      initialFilters[field as keyof FlattenedDataRow] = []
-    })
-
-    setColumnFilters(initialFilters as Record<keyof FlattenedDataRow, string[]>)
+    setUniqueColumnValues((prev) => ({
+      ...prev,
+      ...(uniqueValues as Record<keyof FlattenedDataRow, string[]>),
+    }))
   }, [data])
 
   // Apply filters
@@ -409,14 +486,165 @@ export default function PivotTable() {
         // If no values are selected for this field, don't filter on it
         if (selectedValues.length === 0) return true
 
+        // If the field doesn't exist in this item, don't filter on it
+        const fieldKey = field as keyof FlattenedDataRow
+        if (item[fieldKey] === undefined) return true
+
         // Otherwise, check if the item's value for this field is in the selected values
-        const fieldValue = String(item[field as keyof FlattenedDataRow])
+        const fieldValue = String(item[fieldKey])
         return selectedValues.includes(fieldValue)
       })
     })
 
     setFilteredData(filtered)
   }, [flatData, columnFilters])
+
+  // Fetch services for a repository
+  const fetchServicesForRepo = useCallback(
+    async (asvId: string, repoName: string) => {
+      // Check if this repo already has services loaded
+      const repoData = data.find((item) => item.asv.id === asvId && item.asv.repo.name === repoName)
+
+      // If already fetched and expanded, just toggle expanded state
+      if (expandedRepos.has(`${asvId}-${repoName}`)) {
+        setExpandedRepos((prev) => {
+          const newSet = new Set(prev)
+          newSet.delete(`${asvId}-${repoName}`)
+          return newSet
+        })
+        return
+      }
+
+      // If services are already loaded and not empty, just mark as expanded
+      if (repoData && repoData.asv.repo.services && repoData.asv.repo.services.length > 0) {
+        setExpandedRepos((prev) => {
+          const newSet = new Set(prev)
+          newSet.add(`${asvId}-${repoName}`)
+          return newSet
+        })
+        return
+      }
+
+      setLoadingServices(true)
+      try {
+        const services = await fetchServices(asvId, repoName)
+
+        // Update the data with the fetched services
+        setData((prevData) => {
+          return prevData.map((item) => {
+            if (item.asv.id === asvId && item.asv.repo.name === repoName) {
+              return {
+                ...item,
+                asv: {
+                  ...item.asv,
+                  repo: {
+                    ...item.asv.repo,
+                    services,
+                  },
+                },
+              }
+            }
+            return item
+          })
+        })
+
+        // Mark this repo as expanded
+        setExpandedRepos((prev) => {
+          const newSet = new Set(prev)
+          newSet.add(`${asvId}-${repoName}`)
+          return newSet
+        })
+
+        // Update unique values for service name
+        const serviceNames = services.map((s) => s.name)
+        setUniqueColumnValues((prev) => ({
+          ...prev,
+          serviceName: [...new Set([...prev.serviceName, ...serviceNames])],
+        }))
+      } catch (error) {
+        console.error("Error fetching services:", error)
+      } finally {
+        setLoadingServices(false)
+      }
+    },
+    [expandedRepos, data],
+  )
+
+  // Fetch attributes for a service
+  const fetchAttributesForService = useCallback(
+    async (asvId: string, repoName: string, serviceName: string) => {
+      // If already fetched and expanded, just toggle expanded state
+      if (expandedServices.has(`${asvId}-${repoName}-${serviceName}`)) {
+        setExpandedServices((prev) => {
+          const newSet = new Set(prev)
+          newSet.delete(`${asvId}-${repoName}-${serviceName}`)
+          return newSet
+        })
+        return
+      }
+
+      setLoadingAttributes(true)
+      try {
+        const attributes = await fetchAttributes(asvId, repoName, serviceName)
+
+        // Update the data with the fetched attributes
+        setData((prevData) => {
+          return prevData.map((item) => {
+            if (item.asv.id === asvId && item.asv.repo.name === repoName && item.asv.repo.services) {
+              return {
+                ...item,
+                asv: {
+                  ...item.asv,
+                  repo: {
+                    ...item.asv.repo,
+                    services: item.asv.repo.services.map((service) => {
+                      if (service.name === serviceName) {
+                        return {
+                          ...service,
+                          attributes,
+                        }
+                      }
+                      return service
+                    }),
+                  },
+                },
+              }
+            }
+            return item
+          })
+        })
+
+        // Update available groups to include attribute
+        if (!availableGroups.some((g) => g.id === "attributeName")) {
+          setAvailableGroups((prev) => [...prev, { id: "attributeName", label: "Attribute Name" }])
+        }
+
+        // Update active groups to include attribute if not already included
+        if (!activeGroups.includes("attributeName")) {
+          setActiveGroups((prev) => [...prev, "attributeName"])
+        }
+
+        // Mark this service as expanded
+        setExpandedServices((prev) => {
+          const newSet = new Set(prev)
+          newSet.add(`${asvId}-${repoName}-${serviceName}`)
+          return newSet
+        })
+
+        // Update unique values for attribute name
+        const attributeNames = attributes.map((a) => a["attribute-name"])
+        setUniqueColumnValues((prev) => ({
+          ...prev,
+          attributeName: [...new Set([...prev.attributeName, ...attributeNames])],
+        }))
+      } catch (error) {
+        console.error("Error fetching attributes:", error)
+      } finally {
+        setLoadingAttributes(false)
+      }
+    },
+    [expandedServices, availableGroups, activeGroups],
+  )
 
   // Update a specific column filter
   const updateColumnFilter = (field: keyof FlattenedDataRow, selected: string[]) => {
@@ -426,7 +654,7 @@ export default function PivotTable() {
     }))
   }
 
-  // Group data for display based on active groups
+  // Update the groupData function to handle empty service names better
   const groupData = (data: FlattenedDataRow[]): GroupedData => {
     if (activeGroups.length === 0) return { _rows: data, _isExpanded: true }
 
@@ -437,7 +665,11 @@ export default function PivotTable() {
 
       // Create nested structure based on active groups
       activeGroups.forEach((group, index) => {
-        const groupValue = String(row[group])
+        // Skip if the field doesn't exist in this row
+        if (row[group] === undefined) return
+
+        // Use a special placeholder for empty service names
+        const groupValue = row[group] === "" ? "" : String(row[group])
 
         if (!currentLevel[groupValue]) {
           currentLevel[groupValue] = {
@@ -462,9 +694,10 @@ export default function PivotTable() {
   const groupedData = groupData(filteredData)
 
   // Toggle row expansion
-  const toggleExpand = (path: string[]): void => {
+  const toggleExpand = (path: string[], level: number): void => {
     const element = document.querySelector(`[data-path="${path.join(".")}"]`)
     if (element) {
+      const isExpanding = !element.classList.contains("expanded")
       element.classList.toggle("expanded")
 
       // Toggle visibility of child rows
@@ -472,9 +705,43 @@ export default function PivotTable() {
       childRows.forEach((row) => {
         ;(row as HTMLElement).style.display = element.classList.contains("expanded") ? "table-row" : "none"
       })
+
+      // If this is a repository row and it's being expanded, fetch services
+      if (level === 1 && activeGroups[0] === "asvId" && activeGroups[1] === "repoName" && isExpanding) {
+        const asvId = path[0]
+        const repoName = path[1]
+        if (asvId && repoName) {
+          fetchServicesForRepo(asvId, repoName)
+        }
+      }
+
+      // If this is a service row and it's being expanded, fetch attributes
+      if (
+        level === 2 &&
+        activeGroups[0] === "asvId" &&
+        activeGroups[1] === "repoName" &&
+        activeGroups[2] === "serviceName" &&
+        isExpanding
+      ) {
+        const asvId = path[0]
+        const repoName = path[1]
+        const serviceName = path[2]
+        if (asvId && repoName && serviceName) {
+          fetchAttributesForService(asvId, repoName, serviceName)
+        }
+      }
     }
   }
 
+  // Update the fetchServicesForRepo function to handle clicking on empty service cells
+  const handleEmptyServiceClick = useCallback(
+    (asvId: string, repoName: string) => {
+      fetchServicesForRepo(asvId, repoName)
+    },
+    [fetchServicesForRepo],
+  )
+
+  // Update the renderRows function to add click handler for empty service cells
   const renderRows = (
     data: GroupedData | GroupNode,
     path: string[] = [],
@@ -515,6 +782,21 @@ export default function PivotTable() {
           >
             {activeGroups.map((group, i) => {
               if (i === level) {
+                // If this is an empty service cell at the service level
+                if (level === 2 && activeGroups[2] === "serviceName" && key === "") {
+                  return (
+                    <td key={i} className="group-cell">
+                      <div
+                        className="expander-cell no-data-text"
+                        onClick={() => handleEmptyServiceClick(path[0], path[1])}
+                      >
+                        <span>(No services available - click to load)</span>
+                        {loadingServices && <span className="loading-spinner-small"></span>}
+                      </div>
+                    </td>
+                  )
+                }
+
                 return (
                   <td key={i} className="group-cell">
                     <div className="expander-cell">
@@ -522,10 +804,29 @@ export default function PivotTable() {
                       {level < activeGroups.length - 1 && (
                         <button
                           className={`expander ${currentGroup._isExpanded ? "expanded" : ""}`}
-                          onClick={() => toggleExpand(currentPath)}
+                          onClick={() => toggleExpand(currentPath, level)}
                         ></button>
                       )}
                       <span>{key}</span>
+
+                      {/* Show loading indicator if fetching services or attributes */}
+                      {loadingServices &&
+                        level === 1 &&
+                        activeGroups[0] === "asvId" &&
+                        activeGroups[1] === "repoName" &&
+                        path[0] === currentPath[0] &&
+                        !expandedRepos.has(`${path[0]}-${key}`) && <span className="loading-spinner-small"></span>}
+
+                      {loadingAttributes &&
+                        level === 2 &&
+                        activeGroups[0] === "asvId" &&
+                        activeGroups[1] === "repoName" &&
+                        activeGroups[2] === "serviceName" &&
+                        path[0] === currentPath[0] &&
+                        path[1] === currentPath[1] &&
+                        !expandedServices.has(`${path[0]}-${path[1]}-${key}`) && (
+                          <span className="loading-spinner-small"></span>
+                        )}
                     </div>
                   </td>
                 )
