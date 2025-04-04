@@ -28,11 +28,18 @@
   border-right: 1px solid #e0e0e0;
   display: flex;
   flex-direction: column;
-  transition: transform 0.3s ease;
+  transition: transform 0.3s ease, width 0.3s ease;
   position: relative;
   z-index: 5;
   overflow-y: auto;
   height: 100%;
+}
+
+/* Hide sidebar by default when pivot is not enabled */
+.pivot-table-container:not(.pivot-enabled) .sidebar {
+  width: 0;
+  overflow: hidden;
+  border-right: none;
 }
 
 @media (max-width: 768px) {
@@ -66,25 +73,6 @@
   margin: 0;
   font-size: 18px;
   font-weight: 600;
-}
-
-.sidebar-close {
-  background: transparent;
-  border: none;
-  font-size: 24px;
-  cursor: pointer;
-  color: #666;
-  width: 30px;
-  height: 30px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-}
-
-.sidebar-close:hover {
-  background-color: #e0e0e0;
-  color: #333;
 }
 
 .sidebar-content {
@@ -121,30 +109,66 @@
   text-align: center;
 }
 
-/* Hamburger Menu */
-.hamburger-menu {
+/* Toggle Switch */
+.toggle-switch-container {
   display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  width: 24px;
-  height: 18px;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  padding: 0;
+  align-items: center;
   margin-right: 16px;
 }
 
-.hamburger-menu span {
-  display: block;
-  width: 100%;
-  height: 2px;
-  background-color: #333;
-  transition: all 0.3s ease;
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 48px;
+  height: 24px;
 }
 
-.hamburger-menu:hover span {
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: .4s;
+  border-radius: 24px;
+}
+
+.toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .4s;
+  border-radius: 50%;
+}
+
+input:checked + .toggle-slider {
   background-color: #0066cc;
+}
+
+input:focus + .toggle-slider {
+  box-shadow: 0 0 1px #0066cc;
+}
+
+input:checked + .toggle-slider:before {
+  transform: translateX(24px);
+}
+
+.toggle-label {
+  margin-left: 8px;
+  font-size: 14px;
+  font-weight: 500;
 }
 
 /* Column Header Styles */
