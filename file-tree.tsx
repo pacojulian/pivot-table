@@ -21,11 +21,15 @@ type RepoData = {
   services?: ServiceData[] // Optional as they will be loaded on demand
 }
 
+// Updated ASV data structure
 type ASVData = {
+  asv: string
   id: string
-  repo: RepoData
+  ba: string
+  repositories: RepoData[]
 }
 
+// Updated DataItem structure
 type DataItem = {
   asv: ASVData
 }
@@ -33,6 +37,8 @@ type DataItem = {
 // Define the flattened data structure
 type FlattenedDataRow = {
   asvId: string
+  asvName: string
+  asvBA: string
   repoName: string
   repoUsecase: string
   repoStatus: number
@@ -53,61 +59,87 @@ type GroupNode = {
   [key: string]: GroupNode | FlattenedDataRow[] | boolean | string | undefined
 }
 
-// Sample initial data with only ASV and Repository information
+// Sample initial data with the new structure
 const initialData: DataItem[] = [
   {
     asv: {
+      asv: "ASV-001",
       id: "AllanFranciscoJulianNovoa",
-      repo: {
-        name: "AllanFranciscoJulian/AllanFrancisco",
-        usecase: "Data Analysis",
-        status: 200,
-        services: [], // Empty array instead of undefined
-      },
+      ba: "Finance",
+      repositories: [
+        {
+          name: "AllanFranciscoJulian/AllanFrancisco",
+          usecase: "Data Analysis",
+          status: 200,
+          services: [], // Empty array instead of undefined
+        },
+      ],
     },
   },
   {
     asv: {
-      id: "ASV-002",
-      repo: {
-        name: "Repository B",
-        usecase: "Reporting",
-        status: 200,
-        services: [], // Empty array instead of undefined
-      },
+      asv: "ASV-002",
+      id: "ASV-002-ID",
+      ba: "Marketing",
+      repositories: [
+        {
+          name: "Repository B",
+          usecase: "Reporting",
+          status: 200,
+          services: [], // Empty array instead of undefined
+        },
+      ],
     },
   },
   {
     asv: {
-      id: "ASV-003",
-      repo: {
-        name: "Repository A",
-        usecase: "Analytics",
-        status: 404,
-        services: [], // Empty array instead of undefined
-      },
+      asv: "ASV-003",
+      id: "ASV-003-ID",
+      ba: "Operations",
+      repositories: [
+        {
+          name: "Repository A",
+          usecase: "Analytics",
+          status: 404,
+          services: [], // Empty array instead of undefined
+        },
+        {
+          name: "Repository A-2",
+          usecase: "Monitoring",
+          status: 200,
+          services: [], // Empty array instead of undefined
+        },
+      ],
     },
   },
   {
     asv: {
-      id: "ASV-004",
-      repo: {
-        name: "Repository C",
-        usecase: "Monitoring",
-        status: 200,
-        services: [], // Empty array instead of undefined
-      },
+      asv: "ASV-004",
+      id: "ASV-004-ID",
+      ba: "Sales",
+      repositories: [
+        {
+          name: "Repository C",
+          usecase: "Monitoring",
+          status: 200,
+          services: [], // Empty array instead of undefined
+        },
+      ],
     },
   },
   {
     asv: {
-      id: "ASV-005",
-      repo: {
-        name: "Repository D",
-        usecase: "Data Processing",
-        status: 200,
-        services: [], // Empty array instead of undefined
-      },
+      asv: "ASV-005",
+      id: "ASV-005-ID",
+      ba: "IT",
+      repositories: [
+        {
+          name: "Repository D",
+          usecase: "Data Processing",
+          status: 200,
+          services: [], // Empty array instead of undefined
+        },
+      ],
     },
   },
 ]
@@ -119,6 +151,7 @@ const mockServiceData: Record<string, ServiceData[]> = {
   "Repository B": [{ name: "reporting" }, { name: "export" }],
   "Repository C": [{ name: "monitoring" }, { name: "alerts" }],
   "Repository D": [{ name: "processing" }, { name: "transformation" }],
+  "Repository A-2": [{ name: "metrics" }, { name: "logs" }],
 }
 
 // Mock attribute data for API responses
@@ -133,6 +166,8 @@ const mockAttributeData: Record<string, AttributeData[]> = {
   alerts: [{ "attribute-name": "alertId" }, { "attribute-name": "alertSeverity" }],
   processing: [{ "attribute-name": "processId" }, { "attribute-name": "processStatus" }],
   transformation: [{ "attribute-name": "transformId" }, { "attribute-name": "transformType" }],
+  metrics: [{ "attribute-name": "metricName" }, { "attribute-name": "metricUnit" }],
+  logs: [{ "attribute-name": "logLevel" }, { "attribute-name": "logMessage" }],
 }
 
 // Mock API functions
@@ -150,51 +185,58 @@ const fetchAttributes = async (asvId: string, repoName: string, serviceName: str
   return mockAttributeData[serviceName] || []
 }
 
-// Flatten data for table display
+// Updated flatten data function to handle the new structure
 const flattenData = (data: DataItem[]): FlattenedDataRow[] => {
   const flatData: FlattenedDataRow[] = []
 
   data.forEach((item) => {
     const asv = item.asv
-    const repo = asv.repo
 
-    if (!repo.services || repo.services.length === 0) {
-      // If no services, add a row with just ASV and Repo data, but include an empty serviceName
-      const row: FlattenedDataRow = {
-        asvId: asv.id,
-        repoName: repo.name,
-        repoUsecase: repo.usecase,
-        repoStatus: repo.status,
-        serviceName: "", // Include empty serviceName to maintain column structure
-      }
-      flatData.push(row)
-    } else {
-      repo.services.forEach((service) => {
-        if (!service.attributes || service.attributes.length === 0) {
-          // If no attributes, just add up to service level
-          const row: FlattenedDataRow = {
-            asvId: asv.id,
-            repoName: repo.name,
-            repoUsecase: repo.usecase,
-            repoStatus: repo.status,
-            serviceName: service.name,
-          }
-          flatData.push(row)
-        } else {
-          service.attributes.forEach((attr) => {
+    asv.repositories.forEach((repo) => {
+      if (!repo.services || repo.services.length === 0) {
+        // If no services, add a row with just ASV and Repo data, but include an empty serviceName
+        const row: FlattenedDataRow = {
+          asvId: asv.id,
+          asvName: asv.asv,
+          asvBA: asv.ba,
+          repoName: repo.name,
+          repoUsecase: repo.usecase,
+          repoStatus: repo.status,
+          serviceName: "", // Include empty serviceName to maintain column structure
+        }
+        flatData.push(row)
+      } else {
+        repo.services.forEach((service) => {
+          if (!service.attributes || service.attributes.length === 0) {
+            // If no attributes, just add up to service level
             const row: FlattenedDataRow = {
               asvId: asv.id,
+              asvName: asv.asv,
+              asvBA: asv.ba,
               repoName: repo.name,
               repoUsecase: repo.usecase,
               repoStatus: repo.status,
               serviceName: service.name,
-              attributeName: attr["attribute-name"],
             }
             flatData.push(row)
-          })
-        }
-      })
-    }
+          } else {
+            service.attributes.forEach((attr) => {
+              const row: FlattenedDataRow = {
+                asvId: asv.id,
+                asvName: asv.asv,
+                asvBA: asv.ba,
+                repoName: repo.name,
+                repoUsecase: repo.usecase,
+                repoStatus: repo.status,
+                serviceName: service.name,
+                attributeName: attr["attribute-name"],
+              }
+              flatData.push(row)
+            })
+          }
+        })
+      }
+    })
   })
 
   return flatData
@@ -375,21 +417,36 @@ type AvailableGroup = {
   label: string
 }
 
+// Toggle switch component
+type ToggleSwitchProps = {
+  label: string
+  isChecked: boolean
+  onChange: (checked: boolean) => void
+}
+
+const ToggleSwitch = ({ label, isChecked, onChange }: ToggleSwitchProps) => {
+  return (
+    <div className="toggle-switch-container">
+      <label className="toggle-switch">
+        <input type="checkbox" checked={isChecked} onChange={(e) => onChange(e.target.checked)} />
+        <span className="toggle-slider"></span>
+      </label>
+      <span className="toggle-label">{label}</span>
+    </div>
+  )
+}
+
 // Sidebar component for controls
 type SidebarProps = {
   isOpen: boolean
-  onClose: () => void
   children: React.ReactNode
 }
 
-const Sidebar = ({ isOpen, onClose, children }: SidebarProps) => {
+const Sidebar = ({ isOpen, children }: SidebarProps) => {
   return (
     <div className={`sidebar ${isOpen ? "open" : ""}`}>
       <div className="sidebar-header">
         <h2>Pivot Table Controls</h2>
-        <button className="sidebar-close" onClick={onClose}>
-          ×
-        </button>
       </div>
       <div className="sidebar-content">{children}</div>
     </div>
@@ -412,7 +469,7 @@ export default function PivotTable() {
   const [data, setData] = useState<DataItem[]>(initialData)
   const [flatData, setFlatData] = useState<FlattenedDataRow[]>([])
   const [filteredData, setFilteredData] = useState<FlattenedDataRow[]>([])
-  const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false)
+  const [isPivotEnabled, setIsPivotEnabled] = useState<boolean>(false)
 
   // Loading states
   const [loadingServices, setLoadingServices] = useState<boolean>(false)
@@ -424,7 +481,9 @@ export default function PivotTable() {
 
   // Available grouping fields - initially only ASV and Repository
   const [availableGroups, setAvailableGroups] = useState<AvailableGroup[]>([
+    { id: "asvName", label: "ASV" },
     { id: "asvId", label: "ASV ID" },
+    { id: "asvBA", label: "Business Area" },
     { id: "repoName", label: "Repository Name" },
     { id: "repoUsecase", label: "Repository Usecase" },
     { id: "repoStatus", label: "Repository Status" },
@@ -433,7 +492,7 @@ export default function PivotTable() {
 
   // Grouping state - ordered list of selected groups
   const [activeGroups, setActiveGroups] = useState<Array<keyof FlattenedDataRow>>([
-    "asvId",
+    "asvName",
     "repoName",
     "serviceName", // Include Service Name from the start
   ])
@@ -441,6 +500,8 @@ export default function PivotTable() {
   // Filter states for all columns
   const [columnFilters, setColumnFilters] = useState<Record<keyof FlattenedDataRow, string[]>>({
     asvId: [],
+    asvName: [],
+    asvBA: [],
     repoName: [],
     repoUsecase: [],
     repoStatus: [],
@@ -451,6 +512,8 @@ export default function PivotTable() {
   // Unique values for each column
   const [uniqueColumnValues, setUniqueColumnValues] = useState<Record<keyof FlattenedDataRow, string[]>>({
     asvId: [],
+    asvName: [],
+    asvBA: [],
     repoName: [],
     repoUsecase: [],
     repoStatus: [],
@@ -499,11 +562,33 @@ export default function PivotTable() {
     setFilteredData(filtered)
   }, [flatData, columnFilters])
 
+  // Find repository in data
+  const findRepository = useCallback(
+    (asvId: string, repoName: string): { asvIndex: number; repoIndex: number } | null => {
+      for (let i = 0; i < data.length; i++) {
+        const asv = data[i].asv
+        if (asv.id === asvId) {
+          for (let j = 0; j < asv.repositories.length; j++) {
+            if (asv.repositories[j].name === repoName) {
+              return { asvIndex: i, repoIndex: j }
+            }
+          }
+        }
+      }
+      return null
+    },
+    [data],
+  )
+
   // Fetch services for a repository
   const fetchServicesForRepo = useCallback(
     async (asvId: string, repoName: string) => {
-      // Check if this repo already has services loaded
-      const repoData = data.find((item) => item.asv.id === asvId && item.asv.repo.name === repoName)
+      // Find the repository in the data
+      const repoLocation = findRepository(asvId, repoName)
+      if (!repoLocation) return
+
+      const { asvIndex, repoIndex } = repoLocation
+      const repo = data[asvIndex].asv.repositories[repoIndex]
 
       // If already fetched and expanded, just toggle expanded state
       if (expandedRepos.has(`${asvId}-${repoName}`)) {
@@ -516,7 +601,7 @@ export default function PivotTable() {
       }
 
       // If services are already loaded and not empty, just mark as expanded
-      if (repoData && repoData.asv.repo.services && repoData.asv.repo.services.length > 0) {
+      if (repo.services && repo.services.length > 0) {
         setExpandedRepos((prev) => {
           const newSet = new Set(prev)
           newSet.add(`${asvId}-${repoName}`)
@@ -531,21 +616,22 @@ export default function PivotTable() {
 
         // Update the data with the fetched services
         setData((prevData) => {
-          return prevData.map((item) => {
-            if (item.asv.id === asvId && item.asv.repo.name === repoName) {
-              return {
-                ...item,
-                asv: {
-                  ...item.asv,
-                  repo: {
-                    ...item.asv.repo,
-                    services,
-                  },
+          const newData = [...prevData]
+          newData[asvIndex] = {
+            ...newData[asvIndex],
+            asv: {
+              ...newData[asvIndex].asv,
+              repositories: [
+                ...newData[asvIndex].asv.repositories.slice(0, repoIndex),
+                {
+                  ...newData[asvIndex].asv.repositories[repoIndex],
+                  services,
                 },
-              }
-            }
-            return item
-          })
+                ...newData[asvIndex].asv.repositories.slice(repoIndex + 1),
+              ],
+            },
+          }
+          return newData
         })
 
         // Mark this repo as expanded
@@ -567,17 +653,62 @@ export default function PivotTable() {
         setLoadingServices(false)
       }
     },
-    [expandedRepos, data],
+    [expandedRepos, data, findRepository],
+  )
+
+  // Find service in data
+  const findService = useCallback(
+    (
+      asvId: string,
+      repoName: string,
+      serviceName: string,
+    ): { asvIndex: number; repoIndex: number; serviceIndex: number } | null => {
+      const repoLocation = findRepository(asvId, repoName)
+      if (!repoLocation) return null
+
+      const { asvIndex, repoIndex } = repoLocation
+      const repo = data[asvIndex].asv.repositories[repoIndex]
+
+      if (!repo.services) return null
+
+      for (let i = 0; i < repo.services.length; i++) {
+        if (repo.services[i].name === serviceName) {
+          return { asvIndex, repoIndex, serviceIndex: i }
+        }
+      }
+
+      return null
+    },
+    [data, findRepository],
   )
 
   // Fetch attributes for a service
   const fetchAttributesForService = useCallback(
     async (asvId: string, repoName: string, serviceName: string) => {
+      // Find the service in the data
+      const serviceLocation = findService(asvId, repoName, serviceName)
+      if (!serviceLocation) return
+
+      const { asvIndex, repoIndex, serviceIndex } = serviceLocation
+      const service = data[asvIndex].asv.repositories[repoIndex].services?.[serviceIndex]
+
+      if (!service) return
+
       // If already fetched and expanded, just toggle expanded state
       if (expandedServices.has(`${asvId}-${repoName}-${serviceName}`)) {
         setExpandedServices((prev) => {
           const newSet = new Set(prev)
           newSet.delete(`${asvId}-${repoName}-${serviceName}`)
+          return newSet
+        })
+        return
+      }
+
+      // If attributes are already loaded, just mark as expanded
+      if (service.attributes && service.attributes.length > 0) {
+        setExpandedServices((prev) => {
+          const newSet = new Set(prev)
+          newSet.add(`${asvId}-${repoName}-${serviceName}`)
           return newSet
         })
         return
@@ -589,29 +720,30 @@ export default function PivotTable() {
 
         // Update the data with the fetched attributes
         setData((prevData) => {
-          return prevData.map((item) => {
-            if (item.asv.id === asvId && item.asv.repo.name === repoName && item.asv.repo.services) {
-              return {
-                ...item,
-                asv: {
-                  ...item.asv,
-                  repo: {
-                    ...item.asv.repo,
-                    services: item.asv.repo.services.map((service) => {
-                      if (service.name === serviceName) {
-                        return {
-                          ...service,
-                          attributes,
-                        }
-                      }
-                      return service
-                    }),
-                  },
+          const newData = [...prevData]
+          const services = [...(newData[asvIndex].asv.repositories[repoIndex].services || [])]
+
+          services[serviceIndex] = {
+            ...services[serviceIndex],
+            attributes,
+          }
+
+          newData[asvIndex] = {
+            ...newData[asvIndex],
+            asv: {
+              ...newData[asvIndex].asv,
+              repositories: [
+                ...newData[asvIndex].asv.repositories.slice(0, repoIndex),
+                {
+                  ...newData[asvIndex].asv.repositories[repoIndex],
+                  services,
                 },
-              }
-            }
-            return item
-          })
+                ...newData[asvIndex].asv.repositories.slice(repoIndex + 1),
+              ],
+            },
+          }
+
+          return newData
         })
 
         // Update available groups to include attribute
@@ -643,7 +775,7 @@ export default function PivotTable() {
         setLoadingAttributes(false)
       }
     },
-    [expandedServices, availableGroups, activeGroups],
+    [expandedServices, availableGroups, activeGroups, data, findService],
   )
 
   // Update a specific column filter
@@ -654,7 +786,7 @@ export default function PivotTable() {
     }))
   }
 
-  // Update the groupData function to handle empty service names better
+  // Group data for display based on active groups
   const groupData = (data: FlattenedDataRow[]): GroupedData => {
     if (activeGroups.length === 0) return { _rows: data, _isExpanded: true }
 
@@ -707,27 +839,35 @@ export default function PivotTable() {
       })
 
       // If this is a repository row and it's being expanded, fetch services
-      if (level === 1 && activeGroups[0] === "asvId" && activeGroups[1] === "repoName" && isExpanding) {
-        const asvId = path[0]
-        const repoName = path[1]
-        if (asvId && repoName) {
-          fetchServicesForRepo(asvId, repoName)
+      if (level === 1 && activeGroups[0] === "asvName" && activeGroups[1] === "repoName" && isExpanding) {
+        // Find the ASV ID for this ASV name
+        const asvItem = data.find((item) => item.asv.asv === path[0])
+        if (asvItem) {
+          const asvId = asvItem.asv.id
+          const repoName = path[1]
+          if (asvId && repoName) {
+            fetchServicesForRepo(asvId, repoName)
+          }
         }
       }
 
       // If this is a service row and it's being expanded, fetch attributes
       if (
         level === 2 &&
-        activeGroups[0] === "asvId" &&
+        activeGroups[0] === "asvName" &&
         activeGroups[1] === "repoName" &&
         activeGroups[2] === "serviceName" &&
         isExpanding
       ) {
-        const asvId = path[0]
-        const repoName = path[1]
-        const serviceName = path[2]
-        if (asvId && repoName && serviceName) {
-          fetchAttributesForService(asvId, repoName, serviceName)
+        // Find the ASV ID for this ASV name
+        const asvItem = data.find((item) => item.asv.asv === path[0])
+        if (asvItem) {
+          const asvId = asvItem.asv.id
+          const repoName = path[1]
+          const serviceName = path[2]
+          if (asvId && repoName && serviceName) {
+            fetchAttributesForService(asvId, repoName, serviceName)
+          }
         }
       }
     }
@@ -735,10 +875,17 @@ export default function PivotTable() {
 
   // Update the fetchServicesForRepo function to handle clicking on empty service cells
   const handleEmptyServiceClick = useCallback(
-    (asvId: string, repoName: string) => {
-      fetchServicesForRepo(asvId, repoName)
+    (asvName: string, repoName: string) => {
+      // Find the ASV ID for this ASV name
+      const asvItem = data.find((item) => item.asv.asv === asvName)
+      if (asvItem) {
+        const asvId = asvItem.asv.id
+        if (asvId) {
+          fetchServicesForRepo(asvId, repoName)
+        }
+      }
     },
-    [fetchServicesForRepo],
+    [fetchServicesForRepo, data],
   )
 
   // Update the renderRows function to add click handler for empty service cells
@@ -812,14 +959,14 @@ export default function PivotTable() {
                       {/* Show loading indicator if fetching services or attributes */}
                       {loadingServices &&
                         level === 1 &&
-                        activeGroups[0] === "asvId" &&
+                        activeGroups[0] === "asvName" &&
                         activeGroups[1] === "repoName" &&
                         path[0] === currentPath[0] &&
                         !expandedRepos.has(`${path[0]}-${key}`) && <span className="loading-spinner-small"></span>}
 
                       {loadingAttributes &&
                         level === 2 &&
-                        activeGroups[0] === "asvId" &&
+                        activeGroups[0] === "asvName" &&
                         activeGroups[1] === "repoName" &&
                         activeGroups[2] === "serviceName" &&
                         path[0] === currentPath[0] &&
@@ -922,78 +1069,76 @@ export default function PivotTable() {
     setActiveGroups(activeGroups.filter((g) => g !== groupId))
   }
 
-  // Toggle drawer
-  const toggleDrawer = () => {
-    setIsDrawerOpen(!isDrawerOpen)
+  // Toggle pivot controls
+  const togglePivotControls = (enabled: boolean) => {
+    setIsPivotEnabled(enabled)
   }
 
   return (
-    <div className={`pivot-table-container ${isDrawerOpen ? "sidebar-open" : ""}`}>
-      {/* Top toolbar with hamburger menu */}
+    <div className={`pivot-table-container ${isPivotEnabled ? "pivot-enabled" : ""}`}>
+      {/* Top toolbar with toggle switch */}
       <div className="pivot-toolbar">
-        <button className="hamburger-menu" onClick={toggleDrawer}>
-          <span></span>
-          <span></span>
-          <span></span>
-        </button>
+        <ToggleSwitch label="Pivot" isChecked={isPivotEnabled} onChange={togglePivotControls} />
         <h2 className="pivot-title">Pivot Table</h2>
       </div>
 
       <div className="main-content">
-        {/* Sidebar for controls */}
-        <Sidebar isOpen={isDrawerOpen} onClose={() => setIsDrawerOpen(false)}>
-          <div className="grouping-controls">
-            <h3>Row Grouping</h3>
+        {/* Sidebar for controls - only shown when pivot is enabled */}
+        {isPivotEnabled && (
+          <Sidebar isOpen={true}>
+            <div className="grouping-controls">
+              <h3>Row Grouping</h3>
 
-            <div className="grouping-explanation">
-              <p>Drag and drop to reorder. The order determines the hierarchy of your data grouping.</p>
-            </div>
+              <div className="grouping-explanation">
+                <p>Drag and drop to reorder. The order determines the hierarchy of your data grouping.</p>
+              </div>
 
-            <div className="active-groups">
-              {activeGroups.length > 0 ? (
-                <div className="active-groups-list">
-                  {activeGroups.map((group, index) => (
-                    <div
-                      key={String(group)}
-                      className="group-pill"
-                      draggable
-                      onDragStart={(e) => handleDragStart(e, index)}
-                      onDragOver={handleDragOver}
-                      onDragLeave={handleDragLeave}
-                      onDrop={(e) => handleDrop(e, index)}
-                      onDragEnd={handleDragEnd}
+              <div className="active-groups">
+                {activeGroups.length > 0 ? (
+                  <div className="active-groups-list">
+                    {activeGroups.map((group, index) => (
+                      <div
+                        key={String(group)}
+                        className="group-pill"
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, index)}
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        onDrop={(e) => handleDrop(e, index)}
+                        onDragEnd={handleDragEnd}
+                      >
+                        <span className="group-pill-text">
+                          {index + 1}. {availableGroups.find((g) => g.id === group)?.label}
+                        </span>
+                        <button className="group-pill-remove" onClick={() => removeGroup(group)} title="Remove">
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="no-groups-message">No grouping selected. Select fields below to add grouping.</div>
+                )}
+              </div>
+
+              <div className="available-groups">
+                <div className="available-groups-label">Add field to grouping:</div>
+                <div className="available-groups-list">
+                  {availableGroups.map((group) => (
+                    <button
+                      key={String(group.id)}
+                      className={`available-group-btn ${activeGroups.includes(group.id) ? "disabled" : ""}`}
+                      onClick={() => addGroup(group.id)}
+                      disabled={activeGroups.includes(group.id)}
                     >
-                      <span className="group-pill-text">
-                        {index + 1}. {availableGroups.find((g) => g.id === group)?.label}
-                      </span>
-                      <button className="group-pill-remove" onClick={() => removeGroup(group)} title="Remove">
-                        ×
-                      </button>
-                    </div>
+                      + {group.label}
+                    </button>
                   ))}
                 </div>
-              ) : (
-                <div className="no-groups-message">No grouping selected. Select fields below to add grouping.</div>
-              )}
-            </div>
-
-            <div className="available-groups">
-              <div className="available-groups-label">Add field to grouping:</div>
-              <div className="available-groups-list">
-                {availableGroups.map((group) => (
-                  <button
-                    key={String(group.id)}
-                    className={`available-group-btn ${activeGroups.includes(group.id) ? "disabled" : ""}`}
-                    onClick={() => addGroup(group.id)}
-                    disabled={activeGroups.includes(group.id)}
-                  >
-                    + {group.label}
-                  </button>
-                ))}
               </div>
             </div>
-          </div>
-        </Sidebar>
+          </Sidebar>
+        )}
 
         {/* Main table area */}
         <div className="table-container">
